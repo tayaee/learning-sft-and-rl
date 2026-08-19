@@ -1,0 +1,5 @@
+[tools]
+uv = "latest"
+
+[env]
+UV_TORCH_BACKEND = "cu130"
