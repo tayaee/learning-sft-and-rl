@@ -1,6 +1,6 @@
 # RL Demo — DPO on top of SFT'd Qwen2.5-1.5B
 
-> **목적**: SFT'd 모델(`outputs/qwen2.5-1.5b-sft-merge`)을 시작점으로,
+> **목적**: SFT'd 모델(`outputs/qwen2.5-1.5b-sft-merge/merged`)을 시작점으로,
 > **합성 선호 데이터** 로 **DPO** 를 추가 학습해 응답 일관성·구조를 더 강화.
 > 사전 조건: [`sft-demo.md`](sft-demo.md) Stage 4 완료 (SFT merge 폴더 존재).
 
@@ -30,7 +30,7 @@ mkdir -p data
 
 # 베이스 + SFT'd 모델 로드 → 1000 prompts × 4 samples K=4 → 1000 pairs
 uv run python make_dpo_data.py \
-  --sft-model ./outputs/qwen2.5-1.5b-sft-merge \
+  --sft-model ./outputs/qwen2.5-1.5b-sft-merge/merged \
   --base-model Qwen/Qwen2.5-1.5B-Instruct \
   --num-prompts 1000 \
   --samples-per-prompt 4 \
@@ -84,7 +84,7 @@ cat configs/qwen2.5-1.5b-dpo.yaml | head -20
 ```
 
 핵심 파라미터:
-- `base_model: ./outputs/qwen2.5-1.5b-sft-merge` (SFT'd 모델에서 시작)
+- `base_model: ./outputs/qwen2.5-1.5b-sft-merge/merged` (SFT'd 모델에서 시작)
 - `rl: dpo`, `dpo_beta: 0.1`, `dpo_loss_type: sigmoid`
 - `ref_model: Qwen/Qwen2.5-1.5B-Instruct` (베이스 모델이 reference)
 - `learning_rate: 5e-6` (DPO는 SFT보다 10–20× 낮은 LR)
@@ -108,50 +108,71 @@ uv run axolotl train configs/qwen2.5-1.5b-dpo.yaml 2>&1 | tee logs/dpo.log
 - DPO loss  시작 ~0.69 → 점진적 감소
 - `reward_margin` (chosen - rejected 보상 차이)  양수로 증가 ⇒ 정상
 - DPO 는 SFT보다 훨씬 빠름 (1k pairs × 1 epoch)
-- 완료 시 `./outputs/qwen2.5-1.5b-dpo-merge/` 에 merge된 모델 저장
+- 완료 시 `./outputs/qwen2.5-1.5b-dpo/` 에 **LoRA 어댑터만** 저장됨
+- merge된 모델은 Stage 5에서 별도 생성 (`./outputs/qwen2.5-1.5b-dpo-merge/merged/`)
 
 ---
 
-## 5. RL 모델 검증 (1분)
+## 5. LoRA merge (1분)
+
+> axolotl `train`은 LoRA 어댑터만 저장하므로 **merge 단계가 별도로 필요**합니다.
+> merge된 base+LoRA 모델이 있어야 `query-rl-dpo.py`로 추론할 수 있습니다.
+
+```bash
+cd /home/user1/git/learning-sft-and-rl
+./dpo6-merge.sh
+```
+
+- axolotl은 항상 `output_dir` 하위에 `merged/` 폴더를 만들어 저장
+  → 최종 경로: `./outputs/qwen2.5-1.5b-dpo-merge/merged/`
+
+확인:
+```bash
+ls outputs/qwen2.5-1.5b-dpo-merge/merged/   # config.json, model.safetensors, tokenizer.* 등
+```
+
+---
+
+## 6. RL 모델 검증 (1분)
 
 ```bash
 # merge 폴더 확인
-ls outputs/qwen2.5-1.5b-dpo-merge/
+ls outputs/qwen2.5-1.5b-dpo-merge/merged/
 
 # 추론
-uv run query-rl.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+uv run query-rl-dpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
 ```
 
 **기대 출력**: SFT'd 보다 더 일관된  ###  구조 응답.
 
 ---
 
-## 6. 세 모델 비교 (5분)
+## 7. 세 모델 비교 (5분)
 
 | 모델 | 스크립트 | 경로 |
 |------|----------|------|
 | BASE | `query-base.py` | `Qwen/Qwen2.5-1.5B-Instruct` |
-| SFTED | `query-sft.py` | `./outputs/qwen2.5-1.5b-sft-merge` |
-| RL | `query-rl.py` | `./outputs/qwen2.5-1.5b-dpo-merge` |
+| SFTED | `query-sft.py` | `./outputs/qwen2.5-1.5b-sft-merge/merged` |
+| RL | `query-rl-dpo.py` | `./outputs/qwen2.5-1.5b-dpo-merge/merged` |
 
 ```bash
 # 3-way 동일 질문 비교
 Q="피타고라스 정리를 증명하시오."
 uv run query-base.py  "$Q"
 uv run query-sft.py "$Q"
-uv run query-rl.py    "$Q"
+uv run query-rl-dpo.py    "$Q"
 ```
 
 REPL 모드:
 ```bash
 uv run query-base.py    # 동일 질문을 3 모델에 반복
 uv run query-sft.py
-uv run query-rl.py
+uv run query-rl-dpo.py
 ```
 
 ---
 
-## 7. 차이 요약
+## 8. 차이 요약
 
 | 모델 |  블록 |  단계 구조 | 한국어 일관성 | 응답 일관성 |
 |------|-------|-----------|-------------|-----------|
@@ -166,13 +187,14 @@ DPO 의 효과:
 
 ---
 
-## 8. 한 줄 요약
+## 9. 한 줄 요약
 
 ```bash
 # SFT 가 끝났다면
 uv run python make_dpo_data.py && \
   uv run axolotl train configs/qwen2.5-1.5b-dpo.yaml && \
-  uv run query-rl.py
+  ./dpo6-merge.sh && \
+  uv run query-rl-dpo.py
 ```
 
 ---
@@ -184,7 +206,7 @@ uv run python make_dpo_data.py && \
 | `ref_model` 로딩 실패 | `HF_HUB_OFFLINE=1` 유지 + 로컬 캐시 확인 |
 | DPO loss 가 0.69 그대로 | learning_rate 너무 낮음 → `1e-5` 로 |
 | `reward_margin` 음수 | 데이터 품질 문제 → `make_dpo_data.py` 의 `--num-prompts` 늘리기 |
-| `outputs/qwen2.5-1.5b-dpo-merge` 없음 | train 로그 확인, `lora_model_dir` 설정 OK 인지 |
+| `outputs/qwen2.5-1.5b-dpo-merge` 없음 | train 로그 확인. **Stage 5 `axolotl merge-lora` 명령 실행 필수** (train은 LoRA 어댑터만 저장, merge 별도 단계). 또한 `lora_model_dir` 는 merge 출력 경로가 아니라 어댑터 **입력** 경로임 |
 | 두 모델 출력이 똑같음 | DPO lr/epoch 부족 |
 
 ---

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""query-grpo.py — GRPO (RL) 완료된 모델 추론.
+"""query-rl-grpo.py — GRPO (RL) 완료된 모델 추론.
 
 사용법:
-    uv run query-grpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
-    uv run query-grpo.py                # REPL 모드
+    uv run query-rl-grpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+    uv run query-rl-grpo.py                # REPL 모드
 
 모델 경로: ./outputs/qwen2.5-1.5b-grpo-merge (GRPO 학습 후 merge된 모델)
-사전 요구: grpo-demo.md 의 Stage 4 (GRPO axolotl train) 완료
+사전 요구: rl-grpo-demo.md 의 Stage 4 (GRPO axolotl train) 완료
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "0")
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-GRPO_MODEL = "./outputs/qwen2.5-1.5b-grpo-merge"
+RL_GRPO_MODEL = "./outputs/qwen2.5-1.5b-grpo-merge"
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -34,15 +34,15 @@ def build_argparser() -> argparse.ArgumentParser:
 
 
 def load_model():
-    if not os.path.isdir(GRPO_MODEL):
-        sys.exit(f"[grpo] ERROR: {GRPO_MODEL} 가 없습니다.\n"
-                 f"  먼저 grpo-demo.md Stage 4 (GRPO axolotl train) 을 완료하세요.")
-    print(f"[grpo] loading {GRPO_MODEL} ...", flush=True)
+    if not os.path.isdir(RL_GRPO_MODEL):
+        sys.exit(f"[grpo] ERROR: {RL_GRPO_MODEL} 가 없습니다.\n"
+                 f"  먼저 rl-grpo-demo.md Stage 4 (GRPO axolotl train) 을 완료하세요.")
+    print(f"[grpo] loading {RL_GRPO_MODEL} ...", flush=True)
     dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16,
              "float32": torch.float32}[args.dtype]
-    tok = AutoTokenizer.from_pretrained(GRPO_MODEL)
+    tok = AutoTokenizer.from_pretrained(RL_GRPO_MODEL)
     model = AutoModelForCausalLM.from_pretrained(
-        GRPO_MODEL,
+        RL_GRPO_MODEL,
         dtype=dtype,
         device_map="cuda:0",
         attn_implementation="sdpa",
@@ -80,7 +80,7 @@ def repl_mode(tok, model):
             break
         if not q or q.lower() in ("quit", "exit"):
             break
-        print("\n=== GRPO ===")
+        print("\n=== RL GRPO ===")
         print(ask(tok, model, q))
         print()
 
@@ -91,7 +91,7 @@ def main():
     tok, model = load_model()
 
     if args.prompt:
-        print("\n=== GRPO ===")
+        print("\n=== RL GRPO ===")
         print(ask(tok, model, " ".join(args.prompt)))
     else:
         repl_mode(tok, model)

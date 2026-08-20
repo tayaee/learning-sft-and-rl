@@ -170,7 +170,7 @@ uv run query-sft.py
 
 ## 9. 다음 단계
 
-이제 **RL(DPO)** 로 같은 모델을 더 다듬고 싶다면 → [`rl-demo.md`](rl-demo.md) 참고.
+이제 **RL(DPO)** 로 같은 모델을 더 다듬고 싶다면 → [`rl-dpo-demo.md`](rl-dpo-demo.md) 참고.
 
 ---
 

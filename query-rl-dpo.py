@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""query-rl.py — DPO (RL) 완료된 모델 추론.
+"""query-rl-dpo.py — DPO (RL) 완료된 모델 추론.
 
 사용법:
-    uv run query-rl.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
-    uv run query-rl.py                # REPL 모드
+    uv run query-rl-dpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+    uv run query-rl-dpo.py                # REPL 모드
 
 모델 경로: ./outputs/qwen2.5-1.5b-dpo-merge (DPO 학습 후 merge된 모델)
-사전 요구: rl-demo.md 의 Stage 4 (DPO axolotl train) 완료
+사전 요구: rl-dpo-demo.md 의 Stage 4 (DPO axolotl train) 완료
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "0")
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-RL_MODEL = "./outputs/qwen2.5-1.5b-dpo-merge"
+RL_DPO_MODEL = "./outputs/qwen2.5-1.5b-dpo-merge/merged"
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -34,15 +34,15 @@ def build_argparser() -> argparse.ArgumentParser:
 
 
 def load_model():
-    if not os.path.isdir(RL_MODEL):
-        sys.exit(f"[rl] ERROR: {RL_MODEL} 가 없습니다.\n"
-                 f"  먼저 rl-demo.md Stage 4 (DPO axolotl train) 을 완료하세요.")
-    print(f"[rl] loading {RL_MODEL} ...", flush=True)
+    if not os.path.isdir(RL_DPO_MODEL):
+        sys.exit(f"[rl] ERROR: {RL_DPO_MODEL} 가 없습니다.\n"
+                 f"  먼저 rl-dpo-demo.md Stage 4 (DPO axolotl train) 을 완료하세요.")
+    print(f"[rl] loading {RL_DPO_MODEL} ...", flush=True)
     dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16,
              "float32": torch.float32}[args.dtype]
-    tok = AutoTokenizer.from_pretrained(RL_MODEL)
+    tok = AutoTokenizer.from_pretrained(RL_DPO_MODEL)
     model = AutoModelForCausalLM.from_pretrained(
-        RL_MODEL,
+        RL_DPO_MODEL,
         dtype=dtype,
         device_map="cuda:0",
         attn_implementation="sdpa",
@@ -80,7 +80,7 @@ def repl_mode(tok, model):
             break
         if not q or q.lower() in ("quit", "exit"):
             break
-        print("\n=== RL ===")
+        print("\n=== RL DPO ===")
         print(ask(tok, model, q))
         print()
 

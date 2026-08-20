@@ -160,7 +160,7 @@ uv run axolotl train configs/qwen2.5-1.5b-grpo.yaml
 
 ```bash
 ls outputs/qwen2.5-1.5b-grpo-merge/
-uv run query-grpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+uv run query-rl-grpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
 ```
 
 **기대 출력**:  블록 +  ###  헤더 + 결론 단정 패턴이 **강화**됨.
@@ -173,15 +173,15 @@ uv run query-grpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
 |------|----------|------|
 | BASE | `query-base.py` | `Qwen/Qwen2.5-1.5B-Instruct` |
 | SFT  | `query-sft.py` | `./outputs/qwen2.5-1.5b-sft-merge` |
-| DPO | `query-rl.py` | `./outputs/qwen2.5-1.5b-dpo-merge` |
-| GRPO | `query-grpo.py` | `./outputs/qwen2.5-1.5b-grpo-merge` |
+| DPO | `query-rl-dpo.py` | `./outputs/qwen2.5-1.5b-dpo-merge` |
+| GRPO | `query-rl-grpo.py` | `./outputs/qwen2.5-1.5b-grpo-merge` |
 
 ```bash
 Q="피타고라스 정리를 증명하시오."
 uv run query-base.py    "$Q"
 uv run query-sft.py     "$Q"
-uv run query-rl.py      "$Q"
-uv run query-grpo.py    "$Q"
+uv run query-rl-dpo.py      "$Q"
+uv run query-rl-grpo.py    "$Q"
 ```
 
 ---
@@ -205,7 +205,7 @@ DPO vs GRPO 비교:
 
 ```bash
 # SFT 까지 끝났다면
-uv run query-grpo.py "Q"
+uv run query-rl-grpo.py "Q"
 ```
 
 ---
