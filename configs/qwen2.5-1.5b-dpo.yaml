@@ -1,0 +1,100 @@
+# =====================================================================
+# DPO (RL) demo config for Qwen2.5-1.5B-Instruct on Korean reasoning
+# =====================================================================
+# Stage 2: DPO on top of SFT'd model, using synthetic preference pairs
+#   - chosen = original SFT response (coherent CoT)
+#   - rejected = base model response WITHOUT SFT training
+# DPO pushes the model away from base behavior toward the SFT distribution
+# and refines consistency on the Korean reasoning style.
+#
+# Input:  data/train_dpo.jsonl with {prompt, chosen, rejected}
+# Output: ./outputs/qwen2.5-1.5b-dpo-merged (full model, ready for inference)
+# =====================================================================
+
+base_model: ./outputs/qwen2.5-1.5b-sft-merge    # SFT'd model as start
+model_type: Qwen2ForCausalLM
+tokenizer_type: AutoTokenizer
+
+# ----- precision -----
+bf16: true
+tf32: true
+flash_attention: false
+
+# ----- DPO settings -----
+rl: dpo
+rpo_alpha: 0.0            # 0 = pure DPO, >0 mixes SFT loss
+dpo_beta: 0.1              # KL strength (higher = closer to ref)
+dpo_loss_type: sigmoid    # standard DPO loss
+dpo_label_smoothing: 0.0
+dpo_max_prompt_len: 768
+dpo_max_length: 1024
+
+# ----- reference model (for DPO KL) -----
+ref_model: Qwen/Qwen2.5-1.5B-Instruct    # base model as reference
+
+# ----- dataset -----
+datasets:
+  - path: data
+    train_files: train_dpo.jsonl
+    type: chat_template
+    field_prompt: prompt
+    field_chosen: chosen
+    field_rejected: rejected
+
+val_set_size: 0.01
+dataset_prepared_path: ./outputs/dpo_prepared
+
+# ----- context -----
+sequence_len: 1024
+pad_to_sequence_len: true
+
+# ----- LoRA on top of SFT'd model -----
+adapter: lora
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+lora_target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+
+lora_model_dir: ./outputs/qwen2.5-1.5b-dpo-merge
+
+# ----- output -----
+output_dir: ./outputs/qwen2.5-1.5b-dpo
+
+# ----- training -----
+num_epochs: 1
+micro_batch_size: 2
+gradient_accumulation_steps: 8       # effective batch = 16
+learning_rate: 5.0e-6               # DPO wants ~10-20x lower LR than SFT
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+weight_decay: 0.0
+optimizer: adamw_torch
+logging_steps: 5
+save_steps: 200
+save_total_limit: 2
+evals_per_epoch: 0
+saves_per_epoch: 1
+
+# ----- memory -----
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+
+# ----- Liger -----
+plugins:
+  - axolotl.integrations.liger.LigerPlugin
+
+# ----- logging -----
+wandb_project:
+wandb_entity:
+wandb_watch:
+wandb_name:
+wandb_log_model:
+hub_model_id:

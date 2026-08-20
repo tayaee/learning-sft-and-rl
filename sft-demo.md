@@ -1,0 +1,196 @@
+# SFT Demo — Qwen2.5-1.5B-Instruct + 한국어 CoT 추론
+
+> **목적**: Qwen/Qwen2.5-1.5B-Instruct(베이스, 로컬 캐시) 모델을
+> `train.jsonl` (50k 한국어 추론) 데이터로 **LoRA SFT** 한 뒤,
+> **query-base.py vs query-sft.py** 로 두 모델의 출력 차이를 직접 비교.
+
+---
+
+## 0. 환경 확인 (30초)
+
+```bash
+cd /home/user1/git/learning-sft-and-rl
+
+# GPU / CUDA
+nvidia-smi -L                                # NVIDIA GB10 (Blackwell)
+nvcc --version | head -4                     # 13.0.x
+
+# Python / torch / axolotl
+uv run python -c "import torch,axolotl; print(torch.__version__, torch.version.cuda, axolotl.__version__)"
+# 2.12.1+cu130 13.0 0.18.0
+
+# 로컬 모델 캐시 확인
+ls ~/.cache/huggingface/hub/ | grep Qwen2.5-1.5B-Instruct
+# models--Qwen--Qwen2.5-1.5B-Instruct
+```
+
+> 모든 명령은 **uv run** 으로 실행 (`.venv` 자동 활성화).
+
+---
+
+## 1. 베이스 모델 sanity check (1분)
+
+```bash
+# Qwen2.5-1.5B-Instruct 모델이 로딩되는지 확인
+uv run query-base.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+```
+
+**기대 출력**: 짧고 일반적인 답변,  단계가 없음.
+
+---
+
+## 2. 데이터 sanity check (30초)
+
+```bash
+# train.jsonl 포맷: {"messages": [{"role":"user","content":"..."},
+#                                  {"role":"assistant","content":"..."}]}
+head -1 train.jsonl | uv run python -m json.tool | head -10
+wc -l train.jsonl               # 50000
+```
+
+---
+
+## 3. axolotl config 검증 (1분)
+
+```bash
+cat configs/qwen2.5-1.5b-sft.yaml | head -20
+```
+
+핵심 파라미터:
+- `base_model: Qwen/Qwen2.5-1.5B-Instruct` (HF 캐시 자동 사용)
+- `flash_attention: false` (sm_120 미지원 → SDPA fallback)
+- `lora_r: 16, lora_alpha: 32`
+- `micro_batch_size: 4, gradient_accumulation_steps: 8` → effective batch 32
+- `num_epochs: 1, sequence_len: 1024, sample_packing: true`
+
+---
+
+## 4. SFT 학습 (50–80분)
+
+```bash
+cd /home/user1/git/learning-sft-and-rl
+
+# 모니터링 (별도 터미널)
+watch -n 5 nvidia-smi
+
+# 학습 시작
+uv run axolotl train configs/qwen2.5-1.5b-sft.yaml 2>&1 | tee logs/sft.log
+```
+
+**체크 포인트**:
+- 첫 10 step 안에 GPU 메모리 ~14–18 GB 점유
+- `logging_steps: 10` → loss 가 10 step마다 출력
+- 최종 loss 1.5–2.0 대로 떨어지면 정상
+- 완료 시 `./outputs/qwen2.5-1.5b-sft/` 에 **LoRA 어댑터만** 저장됨
+  (`adapter_config.json`, `adapter_model.safetensors`)
+- merge된 모델은 별도 단계에서 생성 (Stage 5 참고)
+
+서버 로그 위치 (필요시):
+```bash
+mkdir -p logs
+tail -f logs/sft.log                  # 다른 터미널에서
+```
+
+---
+
+## 5. LoRA Merge (30초)
+
+> axolotl의 `train`은 LoRA 어댑터만 저장하므로 **merge 단계가 별도로 필요**합니다.
+> merge된 base+LoRA 모델이 있어야 `query-sft.py`로 추론할 수 있습니다.
+
+```bash
+cd /home/user1/git/learning-sft-and-rl
+
+uv run axolotl merge-lora configs/qwen2.5-1.5b-sft.yaml \
+  --lora-model-dir ./outputs/qwen2.5-1.5b-sft \
+  --output-dir    ./outputs/qwen2.5-1.5b-sft-merge
+```
+
+**체크 포인트**:
+- 명령어 옵션명은 `--lora-model-dir`, `--output-dir` (언더스코어 아닌 대시) — fire CLI 규약
+- axolotl은 항상 `output_dir` 하위에 `merged/` 폴더를 만들어 저장
+  → 최종 경로: `./outputs/qwen2.5-1.5b-sft-merge/merged/`
+- 로그 끝에 `Applied LoRA to N/338 tensors` 형태의 메시지가 나오면 성공 (보통 20–30초)
+
+생성된 폴더 확인:
+```bash
+ls outputs/qwen2.5-1.5b-sft-merge/merged/   # config.json, model.safetensors, tokenizer.* 등
+```
+
+---
+
+## 6. SFT 모델 검증 (1분)
+
+```bash
+# merge 폴더 확인
+ls outputs/qwen2.5-1.5b-sft-merge/merged/
+
+# 추론
+uv run query-sft.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+```
+
+**기대 출력**:  블록 + 단계별 풀이 +  ###  결론. 베이스보다 길고 구조적.
+
+---
+
+## 7. 두 모델 비교 (5분)
+
+```bash
+# 베이스
+uv run query-base.py "다음 명제의 대우를 쓰시오: 모든 소수는 홀수이다."
+
+# SFT
+uv run query-sft.py "다음 명제의 대우를 쓰시오: 모든 소수는 홀수이다."
+```
+
+또는 REPL 모드로 연속 비교:
+
+```bash
+uv run query-base.py
+# [you] 삼각형 ABC의 넓이가 30이고 밑변이 10일 때 높이는?
+# [you] f(x)=x^3-3x+2의 극값을 구하시오.
+# [you] quit
+```
+
+```bash
+uv run query-sft.py
+# 동일한 질문 반복
+```
+
+---
+
+## 8. 차이 요약
+
+| 모델 |  블록 | 단계별 풀이 | 한국어 수학 용어 | 결론 명료성 |
+|------|-------|-----------|----------------|-----------|
+| BASE | 없음 | 약함 | 보통 | 보통 |
+| SFTED | 있음 | 강함 | 자연스러움 | 결론 ### 섹션 |
+
+---
+
+## 9. 다음 단계
+
+이제 **RL(DPO)** 로 같은 모델을 더 다듬고 싶다면 → [`rl-demo.md`](rl-demo.md) 참고.
+
+---
+
+## 트러블슈팅
+
+| 증상 | 해결 |
+|------|------|
+| `flash-attn build failed` | 이미 `flash_attention: false` 설정. 무시. |
+| `CUDA OOM` | `micro_batch_size: 4` → `2` 로 줄이기 |
+| `torch==2.12.1 not found` | `UV_TORCH_BACKEND=cu130` 확인 (mise.toml) |
+| `loss 가 8.0 에서 안 떨어짐` | `learning_rate: 2e-4` → `1e-4` 로 줄이기 |
+| `outputs/qwen2.5-1.5b-sft-merge` 가 없음 | train은 merge를 자동으로 만들지 않음. **Stage 5 `axolotl merge-lora` 명령 실행 필수** (`lora_model_dir`는 merge 출력 경로가 아니라 어댑터 **입력** 경로임) |
+
+---
+
+## 한 줄 요약
+
+```bash
+uv run query-base.py "Q"  \
+  &&  uv run axolotl train configs/qwen2.5-1.5b-sft.yaml  \
+  &&  uv run axolotl merge-lora configs/qwen2.5-1.5b-sft.yaml --lora-model-dir ./outputs/qwen2.5-1.5b-sft --output-dir ./outputs/qwen2.5-1.5b-sft-merge  \
+  &&  uv run query-sft.py "Q"
+```

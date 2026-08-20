@@ -1,0 +1,250 @@
+# GRPO Demo — Group Relative Policy Optimization on SFT'd Qwen2.5-1.5B
+
+> **목적**: SFT'd 모델(`outputs/qwen2.5-1.5b-sft-merge`)을 시작점으로,
+> **rule-based reward 함수** 만으로 **GRPO** 학습해 응답 구조 / 포맷 /
+> 학술 용어 사용을 강화.
+> 사전 조건: [`sft-demo.md`](sft-demo.md) Stage 4 완료 (SFT merge 폴더 존재).
+
+---
+
+## 0. GRPO 의 의의 — DPO 와 어떻게 다른가?
+
+| 비교축 | DPO | GRPO |
+|--------|-----|------|
+| **신호** | (prompt, chosen, rejected) | (prompt) + reward function |
+| **데이터** | 인간 선호 라벨 필요 | 라벨 불필요, 보상 함수만 |
+| **Reference model** | 필요 (KL anchor) | 선택 (beta=0 이면 없음) |
+| **Baseline** | reference KL | **group-relative** (그룹 내 평균) |
+| **Value model** | 없음 | 없음 (PPO 와 차이) |
+| **State-of-the-art** | (구세대) | **DeepSeek-R1, Qwen3-Thinking, o1** (2025) |
+| **학습 안정성** | 선호 품질에 민감 | 그룹 정규화로 안정 |
+| **확장성** | 선호 데이터 한계 | sample 수 ∝ 품질 |
+
+### GRPO 가 "더 낫다" 고 말할 수 있는 경우
+
+| 시나리오 | 추천 | 이유 |
+|----------|------|------|
+| **검증 가능한 정답** (수학, 코딩, 과학) | **GRPO** | rule-based reward 가 정답 일치 여부로 즉시 산출 |
+| **자기 개선 / exploration** | **GRPO** | N개 sample 중 좋은 것 강화 → 모델이 스스로 패턴 발견 |
+| **subjective / 스타일** (톤, 해로움, 친절함) | DPO | 인간 선호가 곧 정답 |
+| **인간 라벨 보유** | DPO | 라벨 쓰지 않으면 낭비 |
+| **GPU 적음** | DPO | GRPO 는 N× 추론 비쌈 |
+| **검증 불가** | DPO | GRPO 는 보상 함수 자체가 정의 불가 |
+
+### GRPO가 DPO 보다 "일반적으로 더 낫다" ?
+
+**아닙니다.** 둘은 **다른 가정** 하에 작동합니다:
+
+- **DPO** : "이 응답 vs 저 응답" 쌍이 주는 **상대적** 신호. **쌍 라벨** 필요.
+- **GRPO** : "응답의 절대 점수" (보상). **점수 함수** 필요.
+
+> 핵심: GRPO 가 2025–2026 SOTA 인 이유는 **검증 가능한 task** (수학·코딩)에서
+> 절대 우위라서. **subjective task** 에선 DPO/RLHF 가 여전히 우위.
+
+### 본 데모에서의 의의
+
+본 데이터(`amphora/korean-reasoning-small`)는 **검증 가능한 정답이 없는 자유 추론**.
+따라서 GRPO 는 **휴리스틱 보상** (포맷, 구조, 학술 용어) 만 사용.
+→ 효과가 "보상 추종" 위주라 DPO 와 비교해서 **국소적으로 우위이지만 절대 우위는 아님**.
+
+진짜 GRPO 우위를 보려면 **GSM8K, MATH, HumanEval** 처럼
+`\boxed{42}` 같은 검증 가능 정답이 있는 데이터셋 사용 권장.
+
+---
+
+## 1. 보상 함수 정의 (이미 작성됨)
+
+`reward_fn.py` 에 정의한 4개 휴리스틱:
+
+| 함수 | 점수 (0–1) | 기반 |
+|------|-----------|------|
+| `format_reward` | 0.5 |  블록 존재 |
+| `structure_reward` | 0.3 / 0.5 |  ###  헤더 개수, 결론 단정 |
+| `length_reward` | -0.5 ~ 1.0 | 응답 길이 (300–1500자) |
+| `keyword_reward` | 0 ~ 1.0 | 한국어 학술 용어 등장 횟수 |
+
+가중치 (`qwen2.5-1.5b-grpo.yaml`):
+```yaml
+reward_weights: [0.3, 0.3, 0.2, 0.2]   # format / structure / length / keyword
+```
+
+확인:
+```bash
+uv run python -c "import reward_fn; print('reward functions:', [f for f in dir(reward_fn) if f.endswith('_reward')])"
+```
+
+---
+
+## 2. GRPO 데이터 (이미 작성됨)
+
+`data/sample_grpo.jsonl` — 20 prompts, GRPO 형식 (`{"prompt": "..."}` 만).
+
+```bash
+wc -l data/sample_grpo.jsonl          # 20
+head -1 data/sample_grpo.jsonl | uv run python -m json.tool | head -5
+```
+
+전체 50k 로 확장하려면:
+```bash
+uv run python -c "
+import json, random
+random.seed(42)
+with open('train.jsonl') as f:
+    rows = [json.loads(l) for l in f]
+random.shuffle(rows)
+with open('data/train_grpo.jsonl', 'w', encoding='utf-8') as f:
+    for r in rows[:5000]:
+        f.write(json.dumps({'prompt': r['messages'][0]['content']}, ensure_ascii=False) + '\n')
+print('wrote 5000 GRPO prompts to data/train_grpo.jsonl')
+"
+# 그 다음 configs/qwen2.5-1.5b-grpo.yaml 의 datasets.train_files 를 train_grpo.jsonl 로 변경
+```
+
+---
+
+## 3. GRPO config 검증 (1분)
+
+```bash
+cat configs/qwen2.5-1.5b-grpo.yaml | head -30
+```
+
+핵심 파라미터:
+- `rl: grpo`, `beta: 0.04` (작은 KL 제약)
+- `trl.num_generations: 4` (그룹 크기)
+- `trl.temperature: 0.9` (응답 다양성)
+- `trl.use_vllm: false` (vLLM 미설치).  빠른 학습 원할 시 `uv add vllm` 후 `true`
+- `learning_rate: 1e-6` (GRPO 매우 낮음, DPO 보다 5× 낮음)
+- `max_steps: 200` (GPU 메모리 보호, 더 길게 가능)
+
+---
+
+## 4. GRPO 학습 (30–60분, use_vllm=false)
+
+```bash
+cd /home/user1/git/learning-sft-and-rl
+
+# 모니터링 (별도 터미널)
+watch -n 5 nvidia-smi
+
+# 학습 시작
+uv run axolotl train configs/qwen2.5-1.5b-grpo.yaml 2>&1 | tee logs/grpo.log
+```
+
+**체크 포인트** (`logging_steps: 1` 이라 매 step 출력):
+- `rewards/format_reward/mean` > 0.15 within 20 steps
+- `rewards/structure_reward/mean` > 0.15
+- `reward_std` > 0 (그룹 내 variance 존재 ⇒ GRPO 신호 살아있음)
+- `entropy` 0.05–0.5 (collapse 했으면 0 근처)
+- `grad_norm` 0.001–1.0
+- 완료 시 `./outputs/qwen2.5-1.5b-grpo-merge/` 에 merge된 모델 저장
+
+### vLLM 으로 10× 빠르게 (선택)
+
+```bash
+# vLLM 설치 (시간 좀 걸림)
+uv add 'vllm>=0.10.2,<0.13.0'
+
+# config 수정
+# configs/qwen2.5-1.5b-grpo.yaml:
+#   trl.use_vllm: true
+# 트레이너 실행 전 vLLM 서버 별도 실행
+# 터미널 1:
+uv run axolotl vllm-serve configs/qwen2.5-1.5b-grpo.yaml
+# 터미널 2:
+uv run axolotl train configs/qwen2.5-1.5b-grpo.yaml
+```
+
+---
+
+## 5. GRPO 모델 검증 (1분)
+
+```bash
+ls outputs/qwen2.5-1.5b-grpo-merge/
+uv run query-grpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+```
+
+**기대 출력**:  블록 +  ###  헤더 + 결론 단정 패턴이 **강화**됨.
+
+---
+
+## 6. 네 모델 비교 (5분)
+
+| 모델 | 스크립트 | 경로 |
+|------|----------|------|
+| BASE | `query-base.py` | `Qwen/Qwen2.5-1.5B-Instruct` |
+| SFT  | `query-sft.py` | `./outputs/qwen2.5-1.5b-sft-merge` |
+| DPO | `query-rl.py` | `./outputs/qwen2.5-1.5b-dpo-merge` |
+| GRPO | `query-grpo.py` | `./outputs/qwen2.5-1.5b-grpo-merge` |
+
+```bash
+Q="피타고라스 정리를 증명하시오."
+uv run query-base.py    "$Q"
+uv run query-sft.py     "$Q"
+uv run query-rl.py      "$Q"
+uv run query-grpo.py    "$Q"
+```
+
+---
+
+## 7. 차이 요약
+
+| 모델 |  블록 |  ###  헤더 | 결론 단정 | 학술 용어 | 길이 통제 |
+|------|-------|-----------|---------|----------|---------|
+| BASE | 약함 | 약함 | 약함 | 보통 | 보통 |
+| SFT  | 강함 | 강함 | 강함 | 자연스러움 | 다양 |
+| DPO  | 강함 | 강함 | 강함 | 자연스러움 | **더 일관** |
+| GRPO | 강함 | **더 강함** | **더 강함** | **더 자연스러움** | **보상 함수가 300–1500 유도** |
+
+DPO vs GRPO 비교:
+- **DPO** : 사람이 만든 (chosen, rejected) 쌍 → **취향 / 스타일** 같은 subjective signal
+- **GRPO** : rule-based reward → **검증 가능 / 절대 점수** 가 있는 objective signal
+
+---
+
+## 8. 한 줄 요약
+
+```bash
+# SFT 까지 끝났다면
+uv run query-grpo.py "Q"
+```
+
+---
+
+## 트러블슈팅
+
+| 증상 | 해결 |
+|------|------|
+| `rewards/format_reward` 0.0 | 학습 시작 전 SFT'd 모델이  블록 생성 잘 하는지 확인 |
+| `reward_std = 0` | temperature 0.9 → 1.0, num_generations 4 → 8 |
+| `entropy` 0.05 미만 (collapse) | learning_rate 더 낮추기, beta 높이기 |
+| `oom` | `max_completion_length: 512` → `256`, `num_generations: 4` → `2` |
+| vLLM 연결 실패 | `use_vllm: false` 로 두고 transformers generation |
+| `outputs/...-merge` 안 생김 | train 로그 확인, `lora_model_dir` 경로 OK? |
+
+---
+
+## 부록: GRPO 가 작동하는 핵심 알고리즘
+
+```
+for each prompt:
+    generate G responses (G = num_generations, e.g., 4)
+    score each response with reward_funcs → rewards[i] (총합)
+    compute normalized advantage:
+        A_i = (rewards[i] - mean(rewards)) / std(rewards)
+    policy update:
+        L = - min( ratio_i * A_i, clip(ratio_i, 1-ε, 1+ε) * A_i )  + β KL(π || π_ref)
+```
+
+핵심: **group 내 표준편차** 로 advantage 추정 → reference model / value model
+**둘 다 필요 없음**. PPO 보다 단순, DPO (pairwise) 보다 절대 점수 활용.
+
+---
+
+## 다음 단계
+
+이 4 모델 비교가 끝났다면 → `evaluate` 또는 `lm-eval` 으로 정량 평가:
+
+```bash
+uv run axolotl lm-eval --model ./outputs/qwen2.5-1.5b-grpo-merge \
+  --tasks kobest_hellaswag,kobest_copa,kmmlu --num_fewshot 0
+```

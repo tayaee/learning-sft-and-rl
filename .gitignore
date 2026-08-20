@@ -1,0 +1,12 @@
+.ipynb_checkpoints
+__pycache__
+data
+logs
+outputs
+
+# 대용량 데이터 파일 (GitHub 100MB 파일 제한 회피, 로컬에서만 사용)
+*.gz
+train.jsonl
+
+# vim/에디터 swap 파일
+*.swp

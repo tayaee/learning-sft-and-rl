@@ -5,13 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "awscli>=1.46.0",
-    "ipykernel>=7.3.0",
-    "jupyter>=1.1.1",
-    "notebook>=7.6.2",
-    "packaging>=26.3",
-    "pydantic>=2.13.4",
-    "setuptools>=84.0.0",
-    "torch==2.6.0",
-    "wheel>=0.48.0",
+    "axolotl>=0.18.0",
+    "torch==2.12.1",
+    "torchao>=0.17.0",
+]
+
+[tool.uv]
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
 ]
