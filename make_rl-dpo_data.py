@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""make_dpo_data.py — 베이스 모델 + SFT 모델로 DPO 학습용 선호 데이터 생성.
+"""make_rl-dpo_data.py — 베이스 모델 + SFT 모델로 DPO 학습용 선호 데이터 생성.
 
 생성 원리 (rejection sampling 경량 버전):
   - 각 prompt 에 대해 K=4 개 응답을 SFT'd 모델에서 샘플링
@@ -7,13 +7,13 @@
   - 점수 함수:  ① CoT  블록 존재 ②  ###  헤더로 구조화된 결론  ③ 응답 길이
   - 베이스 모델 출력도 "rejected" 후보로 섞어서 데이터 다양성 확보
 
-출력:  data/train_dpo.jsonl  (각 줄: {"prompt", "chosen", "rejected"})
-       data/sample_dpo.jsonl  (디버깅용 50건)
+출력:  data/train_rl-dpo.jsonl  (각 줄: {"prompt", "chosen", "rejected"})
+       data/sample_rl-dpo.jsonl  (디버깅용 50건)
 
 사용:
-    uv run python make_dpo_data.py --sft-model ./outputs/qwen2.5-1.5b-sft-merge \
+    uv run python make_rl-dpo_data.py --sft-model ./outputs/qwen2.5-1.5b-sft-merge \
         --base-model Qwen/Qwen2.5-1.5B-Instruct --num-prompts 1000 \
-        --out data/train_dpo.jsonl
+        --out data/train_rl-dpo.jsonl
 """
 from __future__ import annotations
 
@@ -87,8 +87,8 @@ def main():
     ap.add_argument("--sft-model", default="./outputs/qwen2.5-1.5b-sft-merge")
     ap.add_argument("--base-model", default="Qwen/Qwen2.5-1.5B-Instruct")
     ap.add_argument("--train-jsonl", default="train.jsonl")
-    ap.add_argument("--out", default="data/train_dpo.jsonl")
-    ap.add_argument("--sample-out", default="data/sample_dpo.jsonl")
+    ap.add_argument("--out", default="data/train_rl-dpo.jsonl")
+    ap.add_argument("--sample-out", default="data/sample_rl-dpo.jsonl")
     ap.add_argument("--num-prompts", type=int, default=1000)
     ap.add_argument("--samples-per-prompt", type=int, default=4)
     ap.add_argument("--max-new-tokens", type=int, default=512)

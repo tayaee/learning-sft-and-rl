@@ -63,7 +63,7 @@
 | `length_reward` | -0.5 ~ 1.0 | 응답 길이 (300–1500자) |
 | `keyword_reward` | 0 ~ 1.0 | 한국어 학술 용어 등장 횟수 |
 
-가중치 (`qwen2.5-1.5b-grpo.yaml`):
+가중치 (`qwen2.5-1.5b-rl-grpo.yaml`):
 ```yaml
 reward_weights: [0.3, 0.3, 0.2, 0.2]   # format / structure / length / keyword
 ```
@@ -77,11 +77,11 @@ uv run python -c "import reward_fn; print('reward functions:', [f for f in dir(r
 
 ## 2. GRPO 데이터 (이미 작성됨)
 
-`data/sample_grpo.jsonl` — 20 prompts, GRPO 형식 (`{"prompt": "..."}` 만).
+`data/sample_rl-grpo.jsonl` — 20 prompts, GRPO 형식 (`{"prompt": "..."}` 만).
 
 ```bash
-wc -l data/sample_grpo.jsonl          # 20
-head -1 data/sample_grpo.jsonl | uv run python -m json.tool | head -5
+wc -l data/sample_rl-grpo.jsonl          # 20
+head -1 data/sample_rl-grpo.jsonl | uv run python -m json.tool | head -5
 ```
 
 전체 50k 로 확장하려면:
@@ -92,12 +92,12 @@ random.seed(42)
 with open('train.jsonl') as f:
     rows = [json.loads(l) for l in f]
 random.shuffle(rows)
-with open('data/train_grpo.jsonl', 'w', encoding='utf-8') as f:
+with open('data/train_rl-grpo.jsonl', 'w', encoding='utf-8') as f:
     for r in rows[:5000]:
         f.write(json.dumps({'prompt': r['messages'][0]['content']}, ensure_ascii=False) + '\n')
-print('wrote 5000 GRPO prompts to data/train_grpo.jsonl')
+print('wrote 5000 GRPO prompts to data/train_rl-grpo.jsonl')
 "
-# 그 다음 configs/qwen2.5-1.5b-grpo.yaml 의 datasets.train_files 를 train_grpo.jsonl 로 변경
+# 그 다음 configs/qwen2.5-1.5b-rl-grpo.yaml 의 datasets.train_files 를 train_rl-grpo.jsonl 로 변경
 ```
 
 ---
@@ -105,7 +105,7 @@ print('wrote 5000 GRPO prompts to data/train_grpo.jsonl')
 ## 3. GRPO config 검증 (1분)
 
 ```bash
-cat configs/qwen2.5-1.5b-grpo.yaml | head -30
+cat configs/qwen2.5-1.5b-rl-grpo.yaml | head -30
 ```
 
 핵심 파라미터:
@@ -114,7 +114,7 @@ cat configs/qwen2.5-1.5b-grpo.yaml | head -30
 - `trl.temperature: 0.9` (응답 다양성)
 - `trl.use_vllm: false` (vLLM 미설치).  빠른 학습 원할 시 `uv add vllm` 후 `true`
 - `learning_rate: 1e-6` (GRPO 매우 낮음, DPO 보다 5× 낮음)
-- `max_steps: 200` (GPU 메모리 보호, 더 길게 가능)
+- `max_steps: 30` (GPU 메모리 보호, 더 길게 가능)
 
 ---
 
@@ -127,7 +127,7 @@ cd /home/user1/git/learning-sft-and-rl
 watch -n 5 nvidia-smi
 
 # 학습 시작
-uv run axolotl train configs/qwen2.5-1.5b-grpo.yaml 2>&1 | tee logs/grpo.log
+uv run axolotl train configs/qwen2.5-1.5b-rl-grpo.yaml 2>&1 | tee logs/rl-grpo.log
 ```
 
 **체크 포인트** (`logging_steps: 1` 이라 매 step 출력):
@@ -136,7 +136,13 @@ uv run axolotl train configs/qwen2.5-1.5b-grpo.yaml 2>&1 | tee logs/grpo.log
 - `reward_std` > 0 (그룹 내 variance 존재 ⇒ GRPO 신호 살아있음)
 - `entropy` 0.05–0.5 (collapse 했으면 0 근처)
 - `grad_norm` 0.001–1.0
-- 완료 시 `./outputs/qwen2.5-1.5b-grpo-merge/` 에 merge된 모델 저장
+- 완료 시 `./outputs/qwen2.5-1.5b-rl-grpo/` 에 **LoRA 어댑터만** 저장됨
+- merge된 모델은 Stage 5에서 별도 생성 (`./outputs/qwen2.5-1.5b-rl-grpo-merge/merged/`)
+
+> **데모 데이터 (20 prompts) 주의**: `data/sample_rl-grpo.jsonl` 만으로 학습 시
+> 데이터가 20개뿐이라 `max_steps=30` 이상은 같은 prompt 를 반복 사용하게 됨.
+> 본 데모는 `max_steps: 30` 으로 시연 (전체 50k → 500 prompts 로 확장하려면
+> Stage 2 의 스크립트 참조.
 
 ### vLLM 으로 10× 빠르게 (선택)
 
@@ -145,21 +151,44 @@ uv run axolotl train configs/qwen2.5-1.5b-grpo.yaml 2>&1 | tee logs/grpo.log
 uv add 'vllm>=0.10.2,<0.13.0'
 
 # config 수정
-# configs/qwen2.5-1.5b-grpo.yaml:
+# configs/qwen2.5-1.5b-rl-grpo.yaml:
 #   trl.use_vllm: true
 # 트레이너 실행 전 vLLM 서버 별도 실행
 # 터미널 1:
-uv run axolotl vllm-serve configs/qwen2.5-1.5b-grpo.yaml
+uv run axolotl vllm-serve configs/qwen2.5-1.5b-rl-grpo.yaml
 # 터미널 2:
-uv run axolotl train configs/qwen2.5-1.5b-grpo.yaml
+uv run axolotl train configs/qwen2.5-1.5b-rl-grpo.yaml
 ```
 
 ---
 
-## 5. GRPO 모델 검증 (1분)
+## 5. LoRA merge (1분)
+
+> axolotl `train`은 LoRA 어댑터만 저장하므로 **merge 단계가 별도로 필요**합니다.
+> merge된 base+LoRA 모델이 있어야 `query-rl-grpo.py`로 추론할 수 있습니다.
 
 ```bash
-ls outputs/qwen2.5-1.5b-grpo-merge/
+cd /home/user1/git/learning-sft-and-rl
+./rl-grpo-06-merge.sh
+```
+
+- axolotl은 항상 `output_dir` 하위에 `merged/` 폴더를 만들어 저장
+  → 최종 경로: `./outputs/qwen2.5-1.5b-rl-grpo-merge/merged/`
+
+확인:
+```bash
+ls outputs/qwen2.5-1.5b-rl-grpo-merge/merged/   # config.json, model.safetensors, tokenizer.* 등
+```
+
+---
+
+## 6. GRPO 모델 검증 (1분)
+
+```bash
+# merge 폴더 확인
+ls outputs/qwen2.5-1.5b-rl-grpo-merge/merged/
+
+# 추론
 uv run query-rl-grpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
 ```
 
@@ -167,26 +196,27 @@ uv run query-rl-grpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
 
 ---
 
-## 6. 네 모델 비교 (5분)
+## 7. 네 모델 비교 (5분)
 
 | 모델 | 스크립트 | 경로 |
 |------|----------|------|
 | BASE | `query-base.py` | `Qwen/Qwen2.5-1.5B-Instruct` |
-| SFT  | `query-sft.py` | `./outputs/qwen2.5-1.5b-sft-merge` |
-| DPO | `query-rl-dpo.py` | `./outputs/qwen2.5-1.5b-dpo-merge` |
-| GRPO | `query-rl-grpo.py` | `./outputs/qwen2.5-1.5b-grpo-merge` |
+| SFT  | `query-sft.py` | `./outputs/qwen2.5-1.5b-sft-merge/merged` |
+| DPO | `query-rl-dpo.py` | `./outputs/qwen2.5-1.5b-rl-dpo-merge/merged` |
+| GRPO | `query-rl-grpo.py` | `./outputs/qwen2.5-1.5b-rl-grpo-merge/merged` |
 
 ```bash
-Q="피타고라스 정리를 증명하시오."
-uv run query-base.py    "$Q"
-uv run query-sft.py     "$Q"
-uv run query-rl-dpo.py      "$Q"
-uv run query-rl-grpo.py    "$Q"
+./rl-grpo-08-pythagorean-theorem.sh
+# Q="피타고라스 정리를 증명하시오."
+# uv run query-base.py    "$Q"
+# uv run query-sft.py     "$Q"
+# uv run query-rl-dpo.py  "$Q"
+# uv run query-rl-grpo.py "$Q"
 ```
 
 ---
 
-## 7. 차이 요약
+## 8. 차이 요약
 
 | 모델 |  블록 |  ###  헤더 | 결론 단정 | 학술 용어 | 길이 통제 |
 |------|-------|-----------|---------|----------|---------|
@@ -201,11 +231,34 @@ DPO vs GRPO 비교:
 
 ---
 
-## 8. 한 줄 요약
+## 9. lm-eval 정량 평가 (선택, 5분)
+
+정성 비교와 별개로 GRPO 모델의 표준 benchmark 점수를 측정.
+각 task 당 100 samples 제한 (`--limit 100`) 으로 sanity check 용도.
+
+```bash
+./rl-grpo-09-lm-eval-rl-grpo.sh
+```
+
+평가 tasks:
+- 한국어: `kobest_hellaswag`, `kobest_copa`, `kmmlu`
+- 영어: `hellaswag`, `arc_easy`, `piqa`, `winogrande`
+
+결과는 `outputs/lm_eval_results/rl-grpo/` 에 저장됨.
+비교용 BASE/SFT/DPO 점수는 [`sft-demo.md`](sft-demo.md) Stage 8 과 [`rl-dpo-demo.md`](rl-dpo-demo.md) Stage 8 의 결과와 함께 봐야 함.
+
+> 참고: chat template 적용 모델의 경우 `kmmlu` 가 raw 점수보다 낮게
+> 나오는 경향이 있음 (선지 형식 차이). 정성 비교와 함께 봐야 함.
+
+---
+
+## 10. 한 줄 요약
 
 ```bash
 # SFT 까지 끝났다면
-uv run query-rl-grpo.py "Q"
+./rl-grpo-04-run-axolotl.sh && \
+  ./rl-grpo-06-merge.sh && \
+  uv run query-rl-grpo.py "Q"
 ```
 
 ---
@@ -219,7 +272,8 @@ uv run query-rl-grpo.py "Q"
 | `entropy` 0.05 미만 (collapse) | learning_rate 더 낮추기, beta 높이기 |
 | `oom` | `max_completion_length: 512` → `256`, `num_generations: 4` → `2` |
 | vLLM 연결 실패 | `use_vllm: false` 로 두고 transformers generation |
-| `outputs/...-merge` 안 생김 | train 로그 확인, `lora_model_dir` 경로 OK? |
+| `outputs/...-merge` 안 생김 | train 로그 확인. **Stage 5 `axolotl merge-lora` 명령 실행 필수** (train은 LoRA 어댑터만 저장, merge 별도 단계). 또한 `lora_model_dir` 는 merge 출력 경로가 아니라 어댑터 **입력** 경로임 |
+| `reward_fn.py` 에서 TypeError (string indices) | TRL 버전이 completion 을 str 로 전달하는 경우. reward 함수에서 dict/str 모두 처리하도록 수정 (예: `_extract_text` helper) |
 
 ---
 
@@ -242,9 +296,4 @@ for each prompt:
 
 ## 다음 단계
 
-이 4 모델 비교가 끝났다면 → `evaluate` 또는 `lm-eval` 으로 정량 평가:
-
-```bash
-uv run axolotl lm-eval --model ./outputs/qwen2.5-1.5b-grpo-merge \
-  --tasks kobest_hellaswag,kobest_copa,kmmlu --num_fewshot 0
-```
+이 4 모델 비교가 끝났다면 → Stage 9 (`./rl-grpo-09-lm-eval-rl-grpo.sh`) 로 정량 평가.

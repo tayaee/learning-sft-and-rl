@@ -16,7 +16,7 @@
 #       성능 필요 시:  uv add vllm 후 use_vllm: true 로 변경.
 # =====================================================================
 
-base_model: ./outputs/qwen2.5-1.5b-sft-merge
+base_model: ./outputs/qwen2.5-1.5b-sft-merge/merged
 model_type: Qwen2ForCausalLM
 tokenizer_type: AutoTokenizer
 
@@ -61,14 +61,14 @@ ref_model: Qwen/Qwen2.5-1.5B-Instruct
 # ----- dataset -----
 datasets:
   - path: data
-    train_files: sample_grpo.jsonl
+    train_files: sample_rl-grpo.jsonl
     type: chat_template
     field_messages: prompt
     chat_template: chatml
 
 skip_prepare_dataset: false
 val_set_size: 0.0
-dataset_prepared_path: ./outputs/grpo_prepared
+dataset_prepared_path: ./outputs/rl_grpo_prepared
 
 # ----- context -----
 sequence_len: 1024
@@ -88,15 +88,19 @@ lora_target_modules:
   - up_proj
   - down_proj
 
-lora_model_dir: ./outputs/qwen2.5-1.5b-grpo-merge
+# lora_model_dir: 학습 중에는 설정하지 않음 (재개 시 어댑터 입력 경로 전용)
+# merge 출력 경로(`./outputs/qwen2.5-1.5b-rl-grpo-merge/merged`)는
+# 별도 `axolotl merge-lora` 의 `--output-dir` 으로 지정 (rl-grpo-06-merge.sh 참고).
 
 # ----- output -----
-output_dir: ./outputs/qwen2.5-1.5b-grpo
+output_dir: ./outputs/qwen2.5-1.5b-rl-grpo
 
 # ----- training -----
 # GRPO 는 GPU 메모리 많이 사용 (generations + policy + ref)
 # → 작은 batch, 짧은 step 으로 시작
-max_steps: 200
+# 학습 pipeline 시연 목적이라 step 수를 의도적으로 줄임 (200 → 30).
+# 충분한 학습이 필요하면 max_steps 를 200~ 으로 늘리면 됨.
+max_steps: 30
 micro_batch_size: 1
 gradient_accumulation_steps: 4               # effective batch = 4
 generation_batch_size: 4                     # num_generations * prompts_per_step
@@ -106,7 +110,7 @@ warmup_steps: 10
 weight_decay: 0.0
 optimizer: adamw_torch
 logging_steps: 1
-save_steps: 50
+save_steps: 30
 save_total_limit: 2
 
 # ----- memory -----

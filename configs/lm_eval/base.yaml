@@ -1,0 +1,16 @@
+# lm-eval config — BASE 모델 (Qwen2.5-1.5B-Instruct)
+# axolotl lm-eval 가 이 config 의 lm_eval_* 키들을 읽어 lm_eval CLI 를 호출함.
+lm_eval_model: Qwen/Qwen2.5-1.5B-Instruct
+lm_eval_tasks:
+  # 한국어
+  - kobest_hellaswag
+  - kobest_copa
+  - kmmlu
+  # 영어
+  - hellaswag
+  - arc_easy
+  - piqa
+  - winogrande
+lm_eval_batch_size: 8
+apply_chat_template: true
+output_dir: ./outputs/lm_eval_results/base

@@ -3,7 +3,10 @@
 axolotl 의 GRPO 학습에서 trl.reward_funcs 로 참조.
 시그니처:  def fn_name(completions, **kwargs) -> List[float]
 
-completions:  [{"role": "assistant", "content": "..."}, ...]  형식의 dict 리스트
+completions: TRL 버전에 따라 다음 형식 중 하나로 전달됨
+    1) str                      —  "..." (디코딩된 텍스트)
+    2) dict                     —  {"role": "assistant", "content": "..."}
+    3) list[dict]               —  [{"role": ..., "content": ...}, ...]  (대화 형식)
 **kwargs:    데이터셋 컬럼 (예:  answer,  prompt 등).  본 데모에선 사용 안 함.
 반환:   completions 와 같은 길이의 float 리스트 (None 가능 — 해당 샘플 제외)
 """
@@ -13,13 +16,27 @@ import re
 from typing import List
 
 
+def _extract_text(c) -> str:
+    """completion item 에서 텍스트를 추출.  str / dict / list 모두 처리."""
+    if isinstance(c, str):
+        return c
+    if isinstance(c, dict):
+        return c.get("content", "")
+    if isinstance(c, (list, tuple)) and c:
+        first = c[0]
+        if isinstance(first, dict):
+            return first.get("content", "")
+        return str(first)
+    return str(c)
+
+
 # ---------------------------------------------------------
 # 1. format_reward   ブロック  존재
 # ---------------------------------------------------------
 def format_reward(completions, **kwargs) -> List[float]:
     rewards = []
     for c in completions:
-        text = c["content"] if isinstance(c, dict) else c[0]["content"]
+        text = _extract_text(c)
         has_think = bool(re.search(r"<\s*think\s*>.*?<\s*/\s*think\s*>", text, re.DOTALL))
         rewards.append(0.5 if has_think else 0.0)
     return rewards
@@ -31,7 +48,7 @@ def format_reward(completions, **kwargs) -> List[float]:
 def structure_reward(completions, **kwargs) -> List[float]:
     rewards = []
     for c in completions:
-        text = c["content"] if isinstance(c, dict) else c[0]["content"]
+        text = _extract_text(c)
         n_headers = len(re.findall(r"^#+\s+", text, re.MULTILINE))
         has_conclusion = any(
             kw in text for kw in ["따라서", "결론적으로", "정리하면", "답은", "결과적으로"]
@@ -53,7 +70,7 @@ def structure_reward(completions, **kwargs) -> List[float]:
 def length_reward(completions, **kwargs) -> List[float]:
     rewards = []
     for c in completions:
-        text = c["content"] if isinstance(c, dict) else c[0]["content"]
+        text = _extract_text(c)
         L = len(text)
         if L < 100:
             r = -0.5
@@ -88,7 +105,7 @@ KOREAN_ACADEMIC_TERMS = [
 def keyword_reward(completions, **kwargs) -> List[float]:
     rewards = []
     for c in completions:
-        text = c["content"] if isinstance(c, dict) else c[0]["content"]
+        text = _extract_text(c)
         hits = sum(1 for kw in KOREAN_ACADEMIC_TERMS if kw in text)
         # 4개 이상이면 1.0, 0개면 0.0
         rewards.append(min(hits / 4.0, 1.0))
@@ -104,7 +121,7 @@ def accuracy_reward(completions, answer=None, **kwargs) -> List[float]:
         return [0.0] * len(completions)
     rewards = []
     for c, a in zip(completions, answer):
-        text = c["content"] if isinstance(c, dict) else c[0]["content"]
+        text = _extract_text(c)
         m = re.search(r"\\boxed\{([^}]+)\}", text)
         if not m:
             rewards.append(0.0)

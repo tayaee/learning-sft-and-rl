@@ -1,0 +1,13 @@
+# lm-eval config — SFT 모델
+lm_eval_model: ./outputs/qwen2.5-1.5b-sft-merge/merged
+lm_eval_tasks:
+  - kobest_hellaswag
+  - kobest_copa
+  - kmmlu
+  - hellaswag
+  - arc_easy
+  - piqa
+  - winogrande
+lm_eval_batch_size: 8
+apply_chat_template: true
+output_dir: ./outputs/lm_eval_results/sft

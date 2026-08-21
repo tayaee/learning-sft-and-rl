@@ -159,7 +159,32 @@ uv run query-sft.py
 
 ---
 
-## 8. 차이 요약
+## 8. lm-eval 정량 평가 (선택, 5분/모델)
+
+정성 비교와 별개로 표준 benchmark 로 두 모델의 점수를 측정.
+각 task 당 100 samples 제한 (`--limit 100`) 으로 sanity check 용도.
+전체 데이터 평가가 필요하면 스크립트의 `--limit 100` 줄을 제거.
+
+```bash
+# BASE 점수
+./sft-10-lm-eval-base.sh
+
+# SFT 점수
+./sft-11-lm-eval-sft.sh
+```
+
+평가는 다음을 포함:
+- 한국어: `kobest_hellaswag`, `kobest_copa`, `kmmlu`
+- 영어: `hellaswag`, `arc_easy`, `piqa`, `winogrande`
+
+결과는 `outputs/lm_eval_results/<base|sft>/` 에 저장됨.
+
+> 참고: chat template 적용 모델의 경우 `kmmlu` 가 raw 점수보다 낮게
+> 나오는 경향이 있음 (선지 형식 차이). 정성 비교와 함께 봐야 함.
+
+---
+
+## 9. 차이 요약
 
 | 모델 |  블록 | 단계별 풀이 | 한국어 수학 용어 | 결론 명료성 |
 |------|-------|-----------|----------------|-----------|
@@ -168,7 +193,7 @@ uv run query-sft.py
 
 ---
 
-## 9. 다음 단계
+## 10. 다음 단계
 
 이제 **RL(DPO)** 로 같은 모델을 더 다듬고 싶다면 → [`rl-dpo-demo.md`](rl-dpo-demo.md) 참고.
 

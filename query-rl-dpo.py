@@ -5,7 +5,7 @@
     uv run query-rl-dpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
     uv run query-rl-dpo.py                # REPL 모드
 
-모델 경로: ./outputs/qwen2.5-1.5b-dpo-merge (DPO 학습 후 merge된 모델)
+모델 경로: ./outputs/qwen2.5-1.5b-rl-dpo-merge (DPO 학습 후 merge된 모델)
 사전 요구: rl-dpo-demo.md 의 Stage 4 (DPO axolotl train) 완료
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "0")
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-RL_DPO_MODEL = "./outputs/qwen2.5-1.5b-dpo-merge/merged"
+RL_DPO_MODEL = "./outputs/qwen2.5-1.5b-rl-dpo-merge/merged"
 
 
 def build_argparser() -> argparse.ArgumentParser:
