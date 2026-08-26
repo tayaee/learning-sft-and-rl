@@ -33,7 +33,7 @@ ref_model: Qwen/Qwen2.5-1.5B-Instruct    # base model as reference
 
 # ----- dataset -----
 datasets:
-  - path: data
+  - path: data/real                    # real 전용 디렉터리 (smoke 와 분리)
     train_files: train_rl-dpo.jsonl
     type: passthrough    # data is {prompt, chosen, rejected} text; no transform needed
 

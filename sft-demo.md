@@ -2,7 +2,7 @@
 
 > **목적**: Qwen/Qwen2.5-1.5B-Instruct(베이스, 로컬 캐시) 모델을
 > `train.jsonl` (50k 한국어 추론) 데이터로 **LoRA SFT** 한 뒤,
-> **query-base.py vs query-sft.py** 로 두 모델의 출력 차이를 직접 비교.
+> **query_base.py vs query_sft.py** 로 두 모델의 출력 차이를 직접 비교.
 
 ---
 
@@ -28,11 +28,17 @@ ls ~/.cache/huggingface/hub/ | grep Qwen2.5-1.5B-Instruct
 
 ---
 
+> **모드 규약**: 학습/merge/추론 스크립트는 `smoke` 또는 `full` 을 **반드시 인자로 지정**해야 합니다.
+> - `smoke`: 파이프라인 점검용 (소량 데이터 + max_steps 3~10, 수분 내 완주)
+> - `full`: 실제 학습 (기존과 동일한 full 설정)
+> 예: `./sft-06-run-axolotl-smoke.sh`(또는 `./sft-06-run-axolotl.sh smoke`) → `./sft-07-merge-smoke.sh` → `uv run query_sft.py --mode smoke "..."`
+> 모드 지정 스크립트에는 `<script>-smoke.sh` / `<script>-full.sh` 래퍼가 준비되어 있다.
+
 ## 1. 베이스 모델 sanity check (1분)
 
 ```bash
 # Qwen2.5-1.5B-Instruct 모델이 로딩되는지 확인
-uv run query-base.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+uv run query_base.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
 ```
 
 **기대 출력**: 짧고 일반적인 답변,  단계가 없음.
@@ -96,7 +102,7 @@ tail -f logs/sft.log                  # 다른 터미널에서
 ## 5. LoRA Merge (30초)
 
 > axolotl의 `train`은 LoRA 어댑터만 저장하므로 **merge 단계가 별도로 필요**합니다.
-> merge된 base+LoRA 모델이 있어야 `query-sft.py`로 추론할 수 있습니다.
+> merge된 base+LoRA 모델이 있어야 `query_sft.py`로 추론할 수 있습니다.
 
 ```bash
 cd /home/user1/git/learning-sft-and-rl
@@ -126,7 +132,7 @@ ls outputs/qwen2.5-1.5b-sft-merge/merged/   # config.json, model.safetensors, to
 ls outputs/qwen2.5-1.5b-sft-merge/merged/
 
 # 추론
-uv run query-sft.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+uv run query_sft.py --mode full "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
 ```
 
 **기대 출력**:  블록 + 단계별 풀이 +  ###  결론. 베이스보다 길고 구조적.
@@ -137,23 +143,23 @@ uv run query-sft.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
 
 ```bash
 # 베이스
-uv run query-base.py "다음 명제의 대우를 쓰시오: 모든 소수는 홀수이다."
+uv run query_base.py "다음 명제의 대우를 쓰시오: 모든 소수는 홀수이다."
 
 # SFT
-uv run query-sft.py "다음 명제의 대우를 쓰시오: 모든 소수는 홀수이다."
+uv run query_sft.py --mode full "다음 명제의 대우를 쓰시오: 모든 소수는 홀수이다."
 ```
 
 또는 REPL 모드로 연속 비교:
 
 ```bash
-uv run query-base.py
+uv run query_base.py
 # [you] 삼각형 ABC의 넓이가 30이고 밑변이 10일 때 높이는?
 # [you] f(x)=x^3-3x+2의 극값을 구하시오.
 # [you] quit
 ```
 
 ```bash
-uv run query-sft.py
+uv run query_sft.py --mode full
 # 동일한 질문 반복
 ```
 
@@ -170,7 +176,7 @@ uv run query-sft.py
 ./sft-10-lm-eval-base.sh
 
 # SFT 점수
-./sft-11-lm-eval-sft.sh
+./sft-11-lm-eval-sft.sh full        # smoke 면 full 대신 smoke → outputs/lm_eval_results/sft-full/
 ```
 
 평가는 다음을 포함:
@@ -214,8 +220,8 @@ uv run query-sft.py
 ## 한 줄 요약
 
 ```bash
-uv run query-base.py "Q"  \
+uv run query_base.py "Q"  \
   &&  uv run axolotl train configs/qwen2.5-1.5b-sft.yaml  \
   &&  uv run axolotl merge-lora configs/qwen2.5-1.5b-sft.yaml --lora-model-dir ./outputs/qwen2.5-1.5b-sft --output-dir ./outputs/qwen2.5-1.5b-sft-merge  \
-  &&  uv run query-sft.py "Q"
+  &&  uv run query_sft.py --mode full "Q"
 ```

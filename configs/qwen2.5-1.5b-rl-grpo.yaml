@@ -60,7 +60,7 @@ ref_model: Qwen/Qwen2.5-1.5B-Instruct
 
 # ----- dataset -----
 datasets:
-  - path: data
+  - path: data/real                    # real 전용 디렉터리 (smoke 와 분리)
     train_files: sample_rl-grpo.jsonl
     type: chat_template
     field_messages: prompt

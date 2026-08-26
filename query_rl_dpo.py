@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""query-rl-grpo.py — GRPO (RL) 완료된 모델 추론.
+"""query_rl_dpo.py — DPO (RL) 완료된 모델 추론.
 
 사용법:
-    uv run query-rl-grpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
-    uv run query-rl-grpo.py                # REPL 모드
+    uv run query_rl_dpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+    uv run query_rl_dpo.py                # REPL 모드
 
-모델 경로: ./outputs/qwen2.5-1.5b-rl-grpo-merge (GRPO 학습 후 merge된 모델)
-사전 요구: rl-grpo-demo.md 의 Stage 4 (GRPO axolotl train) 완료
+모델 경로: ./outputs/qwen2.5-1.5b-rl-dpo-merge (DPO 학습 후 merge된 모델)
+사전 요구: rl-dpo-demo.md 의 Stage 4 (DPO axolotl train) 완료
 """
 from __future__ import annotations
 
@@ -20,12 +20,17 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "0")
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-RL_GRPO_MODEL = "./outputs/qwen2.5-1.5b-rl-grpo-merge/merged"
+MODEL_PATHS = {
+    "smoke": "./outputs/qwen2.5-1.5b-rl-dpo-smoke-merge/merged",
+    "full":  "./outputs/qwen2.5-1.5b-rl-dpo-merge/merged",
+}
 
 
 def build_argparser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="GRPO merge 모델 추론")
+    p = argparse.ArgumentParser(description="DPO/RL merge 모델 추론")
     p.add_argument("prompt", nargs="*", help="한글 질문 (없으면 REPL)")
+    p.add_argument("--mode", choices=["smoke", "full"], required=True,
+                   help="smoke 또는 full — 반드시 지정")
     p.add_argument("--max-new-tokens", type=int, default=512)
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--dtype", default="bfloat16",
@@ -34,15 +39,16 @@ def build_argparser() -> argparse.ArgumentParser:
 
 
 def load_model():
-    if not os.path.isdir(RL_GRPO_MODEL):
-        sys.exit(f"[grpo] ERROR: {RL_GRPO_MODEL} 가 없습니다.\n"
-                 f"  먼저 rl-grpo-demo.md Stage 4 (GRPO axolotl train) 을 완료하세요.")
-    print(f"[grpo] loading {RL_GRPO_MODEL} ...", flush=True)
+    path = MODEL_PATHS[args.mode]
+    if not os.path.isdir(path):
+        sys.exit(f"[rl] ERROR: {path} 가 없습니다.\n"
+                 f"  먼저 dpo 학습+merge 를 --mode {args.mode} 로 완료하세요.")
+    print(f"[rl] loading {path} ...", flush=True)
     dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16,
              "float32": torch.float32}[args.dtype]
-    tok = AutoTokenizer.from_pretrained(RL_GRPO_MODEL)
+    tok = AutoTokenizer.from_pretrained(path)
     model = AutoModelForCausalLM.from_pretrained(
-        RL_GRPO_MODEL,
+        path,
         dtype=dtype,
         device_map="cuda:0",
         attn_implementation="sdpa",
@@ -80,7 +86,7 @@ def repl_mode(tok, model):
             break
         if not q or q.lower() in ("quit", "exit"):
             break
-        print("\n=== RL GRPO ===")
+        print("\n=== RL DPO ===")
         print(ask(tok, model, q))
         print()
 
@@ -91,7 +97,7 @@ def main():
     tok, model = load_model()
 
     if args.prompt:
-        print("\n=== RL GRPO ===")
+        print("\n=== RL ===")
         print(ask(tok, model, " ".join(args.prompt)))
     else:
         repl_mode(tok, model)
