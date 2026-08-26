@@ -48,7 +48,7 @@ fi
 
 # Determine LAN-reachable hostname.
 # Discover the current host's FQDN dynamically (no hardcoding).
-# Order: env → hostname -f → hostname -A → hostname.
+# Order: env -> hostname -f -> hostname -A -> hostname.
 HOSTNAME="${JUPYTER_HOSTNAME:-}"
 if [ -z "$HOSTNAME" ] && command -v hostname >/dev/null 2>&1; then
   HOSTNAME="$(hostname -f 2>/dev/null || hostname --fqdn 2>/dev/null || true)"
@@ -87,7 +87,15 @@ if [ -z "$RESOLVED_IP" ]; then
   exit 1
 fi
 
+echo "input: pyproject.toml, uv.lock"
+echo "output: Jupyter Server (http://${HOSTNAME}:${PORT})"
+
 echo "Host FQDN: ${HOSTNAME} -> ${RESOLVED_IP}"
 echo "Starting Jupyter Notebook at http://${HOSTNAME}:${PORT}"
-# Bind all interfaces for LAN access.
-exec uv run jupyter notebook --port="$PORT" --no-browser --ip=0.0.0.0
+
+set -x
+uv run jupyter notebook --port="$PORT" --no-browser --ip=0.0.0.0
+set +x
+
+echo "input: pyproject.toml, uv.lock"
+echo "output: Jupyter Server (http://${HOSTNAME}:${PORT})"

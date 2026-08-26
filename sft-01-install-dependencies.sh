@@ -7,4 +7,13 @@
 #   `--no-build-isolation` 으로 한 번에 설치됨 (deprecation 으로 향후 deprecated 예정)
 # - AWS CLI 는 s3 동기화가 필요한 경우 `uv add awscli` 로 별도 추가 가능 (기본은 제외)
 set -euo pipefail
+
+echo "input: pyproject.toml, uv.lock"
+echo "output: .venv"
+
+set -x
 UV_TORCH_BACKEND="${UV_TORCH_BACKEND:-cu130}" uv sync
+set +x
+
+echo "input: pyproject.toml, uv.lock"
+echo "output: .venv"

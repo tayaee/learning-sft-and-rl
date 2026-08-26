@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 # rl-dpo-09: DPO 모델 lm-eval (한국어 + 영어 tasks)
 #   $1 = smoke | full (반드시 지정) — 모델 경로와 결과 저장 경로가 모드별로 분리됨
 source "$(dirname "$0")/scripts_common.sh"
@@ -10,11 +10,17 @@ else
   MODEL=./outputs/qwen2.5-1.5b-rl-dpo-merge/merged
 fi
 
+OUT=./outputs/lm_eval_results/rl-dpo-$MODE
+
+echo "input: $MODEL"
+echo "output: $OUT"
+
 if [ ! -d "$MODEL" ]; then
   echo "ERROR: $MODEL 가 없습니다. 먼저 dpo 학습+merge 를 --mode $MODE 로 완료하세요." >&2
   exit 1
 fi
 
+set -x
 uv run lm_eval \
   --model hf \
   --model_args pretrained="$MODEL",dtype=bfloat16 \
@@ -22,4 +28,8 @@ uv run lm_eval \
   --apply_chat_template \
   --batch_size 8 \
   --limit 100 \
-  --output_path ./outputs/lm_eval_results/rl-dpo-$MODE
+  --output_path "$OUT"
+set +x
+
+echo "input: $MODEL"
+echo "output: $OUT"

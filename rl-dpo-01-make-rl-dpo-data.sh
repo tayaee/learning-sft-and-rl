@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 # rl-dpo-01: DPO 선호 데이터 생성 (smoke / full 선택 — 반드시 지정)
 #   smoke → 50 prompts  → data/smoke/train_rl-dpo.jsonl (+ sample)
 #   full  → 1000 prompts → data/full/train_rl-dpo.jsonl (+ sample)
@@ -17,12 +17,16 @@ fi
 OUT="data/$MODE/train_rl-dpo.jsonl"
 SAMPLE="data/$MODE/sample_rl-dpo.jsonl"
 
+echo "input: $SFT_MODEL, Qwen/Qwen2.5-1.5B-Instruct"
+echo "output: $OUT, $SAMPLE"
+
 if [ ! -d "$SFT_MODEL" ]; then
   echo "ERROR: $SFT_MODEL 가 없습니다. 먼저 sft 학습+merge 를 --mode $MODE 로 완료하세요." >&2
   exit 1
 fi
 
 mkdir -p "data/$MODE" logs
+set -x
 uv run python make_rl_dpo_data.py \
   --sft-model "$SFT_MODEL" \
   --base-model Qwen/Qwen2.5-1.5B-Instruct \
@@ -30,3 +34,7 @@ uv run python make_rl_dpo_data.py \
   --samples-per-prompt 4 \
   --out "$OUT" \
   --sample-out "$SAMPLE"
+set +x
+
+echo "input: $SFT_MODEL, Qwen/Qwen2.5-1.5B-Instruct"
+echo "output: $OUT, $SAMPLE"
