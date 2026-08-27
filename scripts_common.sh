@@ -39,6 +39,18 @@ require_mode() {
   echo "$mode"
 }
 
+ensure_train_jsonl() {
+  if [ ! -f "train.jsonl" ]; then
+    if [ -f "train.jsonl.gz" ]; then
+      echo "INFO: train.jsonl 이 없어서 train.jsonl.gz 로부터 압축을 해제(gunzip -k)합니다..."
+      gunzip -k "train.jsonl.gz"
+    else
+      echo "ERROR: train.jsonl 및 train.jsonl.gz 파일이 존재하지 않습니다." >&2
+      return 1
+    fi
+  fi
+}
+
 _make() {
   local target="$1"
   shift

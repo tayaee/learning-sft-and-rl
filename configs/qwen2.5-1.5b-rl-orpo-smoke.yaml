@@ -10,7 +10,7 @@
 #   odds_ratio_loss 로그 출력  ③ 어댑터 저장  ④ merge-lora 성공
 # =====================================================================
 
-base_model: ./outputs/qwen2.5-1.5b-sft-merge/merged
+base_model: ./outputs/qwen2.5-1.5b-sft-smoke-merge/merged
 model_type: Qwen2ForCausalLM
 tokenizer_type: AutoTokenizer
 

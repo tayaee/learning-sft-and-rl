@@ -13,6 +13,7 @@ if [ "$MODE" = "smoke" ]; then
   echo "input: $CFG, $IN_DATA"
   echo "output: $OUT_DIR, $LOG$OUT_EXTRA"
   if [ ! -f data/smoke/train-sft.jsonl ]; then
+    ensure_train_jsonl || exit 1
     mkdir -p data/smoke
     head -n 200 train.jsonl > data/smoke/train-sft.jsonl
     wc -l data/smoke/train-sft.jsonl
@@ -25,6 +26,7 @@ else
   OUT_EXTRA=""
   echo "input: $CFG, $IN_DATA"
   echo "output: $OUT_DIR, $LOG"
+  ensure_train_jsonl || exit 1
 fi
 
 mkdir -p logs

@@ -32,7 +32,7 @@ orpo_alpha: 1.0            # trl ORPOConfig.beta 로 매핑됨 (odds-ratio loss 
 # 주의: train_files 라는 키는 axolotl 에 없음. path 에 단일 파일을 직접 지정해야
 # data/ 디렉터리 전체가 로드되는 사고를 막을 수 있음.
 datasets:
-  - path: data/real/train_rl-orpo.jsonl    # real 전용 디렉터리 (smoke 와 분리)
+  - path: data/full/train_rl-orpo.jsonl    # full 전용 디렉터리 (smoke 와 분리)
     type: passthrough               # 메시지 리스트 {prompt, chosen[], rejected[]} 그대로 전달
     chat_template: chatml
 

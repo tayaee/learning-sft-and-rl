@@ -25,6 +25,8 @@ if [ ! -d "$SFT_MODEL" ]; then
   exit 1
 fi
 
+ensure_train_jsonl || exit 1
+
 mkdir -p "data/$MODE" logs
 
 _make "$OUT" "$SFT_MODEL" -- \

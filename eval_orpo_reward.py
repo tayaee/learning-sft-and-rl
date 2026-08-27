@@ -43,7 +43,10 @@ def main():
     ap.add_argument("--out", default=None, help="결과 jsonl 저장 경로(선택)")
     args = ap.parse_args()
 
-    random.seed(args.seed)
+    if not os.path.exists("train.jsonl") and os.path.exists("train.jsonl.gz"):
+        import subprocess
+        print("[gunzip] train.jsonl.gz -> train.jsonl", flush=True)
+        subprocess.run(["gunzip", "-k", "train.jsonl.gz"], check=True)
 
     with open("train.jsonl", encoding="utf-8") as f:
         rows = [json.loads(line) for line in f]

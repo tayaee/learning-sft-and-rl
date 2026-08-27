@@ -86,6 +86,11 @@ def generate(args):
     dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16,
              "float32": torch.float32}[args.dtype]
 
+    if not os.path.exists(args.train_jsonl) and os.path.exists(args.train_jsonl + ".gz"):
+        import subprocess
+        print(f"[gunzip] {args.train_jsonl}.gz -> {args.train_jsonl}", flush=True)
+        subprocess.run(["gunzip", "-k", args.train_jsonl + ".gz"], check=True)
+
     print(f"[read] {args.train_jsonl}", flush=True)
     with open(args.train_jsonl, encoding="utf-8") as f:
         rows = [json.loads(line) for line in f]
