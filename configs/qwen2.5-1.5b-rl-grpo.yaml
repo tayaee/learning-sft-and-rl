@@ -60,13 +60,9 @@ ref_model: Qwen/Qwen2.5-1.5B-Instruct
 
 # ----- dataset -----
 datasets:
-  - path: data/real                    # real 전용 디렉터리 (smoke 와 분리)
-    train_files: sample_rl-grpo.jsonl
-    type: chat_template
-    field_messages: prompt
-    chat_template: chatml
+  - path: data/full/sample_rl-grpo.jsonl
 
-skip_prepare_dataset: false
+skip_prepare_dataset: true
 val_set_size: 0.0
 dataset_prepared_path: ./outputs/rl_grpo_prepared
 
