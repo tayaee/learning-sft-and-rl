@@ -1,10 +1,8 @@
 #!/bin/bash
 # rl-orpo-02: ORPO 데이터 sanity check — chosen vs rejected 눈으로 비교
-#   $1 = smoke | full (반드시 지정)
-# 데이터는 TRL conversational 용 메시지 리스트 포맷:
-#   {"prompt": str, "chosen": [user, assistant], "rejected": [user, assistant]}
 source "$(dirname "$0")/scripts_common.sh"
-MODE=$(require_mode "${1:-}" "$0") || exit 1
+parse_flags "$@"
+MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
 DATA="data/$MODE/train_rl-orpo.jsonl"
 
 if [ "$MODE" = "smoke" ]; then
@@ -36,7 +34,7 @@ assert len(d['chosen']) == len(d['rejected']) == 2
 print('\n[ok] message-list format valid')
 "
 wc -l "$DATA"
-more "$CFG"
+cat "$CFG"
 set +x
 
 echo "input: $DATA, $CFG"

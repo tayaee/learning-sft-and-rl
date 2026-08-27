@@ -1,8 +1,8 @@
 #!/bin/bash
 # sft-08: HF Hub 업로드 (merge 완료 후)
-#   $1 = smoke | full (생략 시 full 기본) — 모드별 로컬 merge 디렉터리와 Hub repo 가 분리됨
 source "$(dirname "$0")/scripts_common.sh"
-MODE=$(require_mode "${1:-full}" "$0") || exit 1
+parse_flags "$@"
+MODE=$(require_mode "${1:-full}" "$0" "$@") || exit 1
 
 if [ "$MODE" = "smoke" ]; then
   SRC=./outputs/qwen2.5-1.5b-sft-smoke-merge/merged

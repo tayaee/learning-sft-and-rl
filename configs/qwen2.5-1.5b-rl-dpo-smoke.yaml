@@ -11,7 +11,7 @@
 #   ③ 어댑터 저장  ④ merge-lora 성공
 # =====================================================================
 
-base_model: ./outputs/qwen2.5-1.5b-sft-merge/merged
+base_model: ./outputs/qwen2.5-1.5b-sft-smoke-merge/merged
 model_type: Qwen2ForCausalLM
 tokenizer_type: AutoTokenizer
 
@@ -33,8 +33,7 @@ ref_model: Qwen/Qwen2.5-1.5B-Instruct
 
 # ----- dataset -----
 datasets:
-  - path: data/smoke                   # smoke 전용 디렉터리 (real 과 분리)
-    train_files: train_rl-dpo.jsonl
+  - path: data/smoke/train_rl-dpo.jsonl   # smoke 전용 파일 직접 지정
     type: passthrough
 
 val_set_size: 0.0

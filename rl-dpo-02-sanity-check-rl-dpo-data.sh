@@ -1,8 +1,8 @@
 #!/bin/bash
 # rl-dpo-02: 같은 prompt 에 대한 chosen vs rejected 비교
-#   $1 = smoke | full (반드시 지정)
 source "$(dirname "$0")/scripts_common.sh"
-MODE=$(require_mode "${1:-}" "$0") || exit 1
+parse_flags "$@"
+MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
 SAMPLE="data/$MODE/sample_rl-dpo.jsonl"
 DATA="data/$MODE/train_rl-dpo.jsonl"
 

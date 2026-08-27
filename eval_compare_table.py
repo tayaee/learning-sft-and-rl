@@ -26,7 +26,7 @@ SUITES = {"general": "평가 ① General 지능 (TinyBenchmarks)",
 
 def find_results(d: str) -> list[str]:
     """디렉터리 안의 results_*.json 경로들 (최신순)."""
-    return sorted(glob.glob(os.path.join(d, "**", "results_*.json"), recursive=True))
+    return sorted(glob.glob(os.path.join(d, "**", "results_*.json"), recursive=True, include_hidden=True))
 
 
 def load_metrics(d: str) -> dict[str, tuple[float, float]] | None:
