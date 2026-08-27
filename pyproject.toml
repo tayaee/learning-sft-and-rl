@@ -12,6 +12,7 @@ dependencies = [
     "notebook>=7.6.2",
     "torch==2.12.1",
     "torchao>=0.17.0",
+    "tinybenchmarks @ git+https://github.com/felipemaiapolo/tinyBenchmarks",
 ]
 
 [tool.uv]
