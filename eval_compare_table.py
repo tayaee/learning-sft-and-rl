@@ -45,7 +45,15 @@ def load_metrics(d: str) -> dict[str, tuple[float, float]] | None:
             score, stderr, metric = m["acc,none"], m.get("acc_stderr,none"), "acc"
         else:
             continue
-        out[task] = (float(score), float(stderr) if stderr is not None else float("nan"), metric)
+        try:
+            stderr_val = float(stderr) if (stderr is not None and stderr != "N/A") else float("nan")
+        except (ValueError, TypeError):
+            stderr_val = float("nan")
+        try:
+            score_val = float(score) if (score is not None and score != "N/A") else float("nan")
+        except (ValueError, TypeError):
+            score_val = float("nan")
+        out[task] = (score_val, stderr_val, metric)
     return out
 
 
