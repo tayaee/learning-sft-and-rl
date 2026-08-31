@@ -3,7 +3,7 @@
 source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
-SAMPLE="data/$MODE/sample_rl-grpo.jsonl"
+SAMPLE="data/grpo-$MODE-out/sample_rl-grpo.jsonl"
 
 echo "input: $SAMPLE"
 echo "output: (stdout)"

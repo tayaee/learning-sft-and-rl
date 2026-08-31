@@ -7,7 +7,7 @@ ORPO 가 선호 데이터를 잘 학습했다면 ORPO 평균 점수가 유의미
 
 사용:
     uv run python eval_orpo_reward.py --mode full
-    uv run python eval_orpo_reward.py --mode smoke --num-prompts 10
+    uv run python eval_orpo_reward.py --mode mini --num-prompts 10
 """
 from __future__ import annotations
 
@@ -23,20 +23,20 @@ import torch
 from make_rl_dpo_data import chat_generate, load, score
 
 PATHS = {
-    "smoke": "./outputs/qwen2.5-1.5b-rl-orpo-smoke-merge/merged",
-    "full": "./outputs/qwen2.5-1.5b-rl-orpo-merge/merged",
+    "mini": "./data/orpo-mini-out/merged",
+    "full": "./data/orpo-full-out/merged",
 }
 
 # 비교 대상 SFT 베이스라인도 같은 모드의 merge 모델 사용 (모드 간 섞임 방지)
 SFT_PATHS = {
-    "smoke": "./outputs/qwen2.5-1.5b-sft-smoke-merge/merged",
-    "full": "./outputs/qwen2.5-1.5b-sft-merge/merged",
+    "mini": "./data/sft-mini-out/merged",
+    "full": "./data/sft-full-out/merged",
 }
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["smoke", "full"], default="full")
+    ap.add_argument("--mode", choices=["mini", "full"], default="full")
     ap.add_argument("--num-prompts", type=int, default=50)
     ap.add_argument("--max-new-tokens", type=int, default=512)
     ap.add_argument("--seed", type=int, default=1234)

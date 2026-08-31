@@ -1,17 +1,17 @@
 #!/bin/bash
-# rl-orpo-01: ORPO 선호 데이터 생성 (smoke / full 선택 — 반드시 지정)
+# rl-orpo-01: ORPO 선호 데이터 생성 (mini / full 선택 — 반드시 지정)
 source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
 
-if [ "$MODE" = "smoke" ]; then
+if [ "$MODE" = "mini" ]; then
   N=20
 else
   N=1000
 fi
 
-FROM_DPO="data/$MODE/train_rl-dpo.jsonl"
-OUT="data/$MODE/train_rl-orpo.jsonl"
+FROM_DPO="data/dpo-$MODE-out/train_rl-dpo.jsonl"
+OUT="data/orpo-$MODE-out/train_rl-orpo.jsonl"
 
 echo "input: $FROM_DPO"
 echo "output: $OUT"
@@ -21,7 +21,7 @@ if [ ! -f "$FROM_DPO" ]; then
   exit 1
 fi
 
-mkdir -p "data/$MODE"
+mkdir -p "data/orpo-$MODE-out"
 
 _make "$OUT" "$FROM_DPO" -- \
   uv run python make_rl_orpo_data.py \

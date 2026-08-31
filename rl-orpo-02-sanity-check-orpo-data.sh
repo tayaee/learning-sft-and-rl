@@ -3,12 +3,12 @@
 source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
-DATA="data/$MODE/train_rl-orpo.jsonl"
+DATA="data/orpo-$MODE-out/train_rl-orpo.jsonl"
 
-if [ "$MODE" = "smoke" ]; then
-  CFG="configs/qwen2.5-1.5b-rl-orpo-smoke.yaml"
+if [ "$MODE" = "mini" ]; then
+  CFG="data/orpo-mini-config/qwen2.5-1.5b-rl-orpo-mini.yaml"
 else
-  CFG="configs/qwen2.5-1.5b-rl-orpo.yaml"
+  CFG="data/orpo-full-config/qwen2.5-1.5b-rl-orpo.yaml"
 fi
 
 echo "input: $DATA, $CFG"

@@ -2,13 +2,13 @@
 """query_rl_orpo.py — ORPO 완료 모델 추론.
 
 사용법:
-    uv run query_rl_orpo.py --mode smoke "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+    uv run query_rl_orpo.py --mode mini "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
     uv run query_rl_orpo.py --mode full  "피타고라스 정리를 증명하시오."
     uv run query_rl_orpo.py --mode full              # REPL 모드
 
 모델 경로:
-    full  → ./outputs/qwen2.5-1.5b-rl-orpo-merge/merged
-    smoke → ./outputs/qwen2.5-1.5b-rl-orpo-smoke-merge/merged
+    full  → ./data/orpo-full-out/merged
+    mini  → ./data/orpo-mini-out/merged
 사전 요구: rl-orpo-04-run-axolotl.sh + rl-orpo-05-merge.sh 완료
 """
 from __future__ import annotations
@@ -24,15 +24,15 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODEL_PATHS = {
-    "smoke": "./outputs/qwen2.5-1.5b-rl-orpo-smoke-merge/merged",
-    "full": "./outputs/qwen2.5-1.5b-rl-orpo-merge/merged",
+    "mini": "./data/orpo-mini-out/merged",
+    "full": "./data/orpo-full-out/merged",
 }
 
 
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="ORPO merge 모델 추론")
     p.add_argument("prompt", nargs="*", help="한글 질문 (없으면 REPL)")
-    p.add_argument("--mode", choices=["smoke", "full"], default="full")
+    p.add_argument("--mode", choices=["mini", "full"], default="full")
     p.add_argument("--max-new-tokens", type=int, default=512)
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--dtype", default="bfloat16",

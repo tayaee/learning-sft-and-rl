@@ -4,14 +4,14 @@ source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
 
-if [ "$MODE" = "smoke" ]; then
+if [ "$MODE" = "mini" ]; then
   N=10
-  SFT_MODEL=./outputs/qwen2.5-1.5b-sft-smoke-merge/merged
-  ORPO_MODEL=./outputs/qwen2.5-1.5b-rl-orpo-smoke-merge/merged
+  SFT_MODEL=./data/sft-mini-out/merged
+  ORPO_MODEL=./data/orpo-mini-out/merged
 else
   N=50
-  SFT_MODEL=./outputs/qwen2.5-1.5b-sft-merge/merged
-  ORPO_MODEL=./outputs/qwen2.5-1.5b-rl-orpo-merge/merged
+  SFT_MODEL=./data/sft-full-out/merged
+  ORPO_MODEL=./data/orpo-full-out/merged
 fi
 OUT="outputs/eval_results/orpo-reward-$MODE.jsonl"
 

@@ -4,10 +4,10 @@ source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-full}" "$0" "$@") || exit 1
 
-if [ "$MODE" = "smoke" ]; then
-  MODEL=./outputs/qwen2.5-1.5b-sft-smoke-merge/merged
+if [ "$MODE" = "mini" ]; then
+  MODEL=./data/sft-mini-out/merged
 else
-  MODEL=./outputs/qwen2.5-1.5b-sft-merge/merged
+  MODEL=./data/sft-full-out/merged
 fi
 
 OUT=./outputs/lm_eval_results/sft-$MODE

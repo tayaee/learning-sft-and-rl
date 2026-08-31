@@ -9,7 +9,7 @@ eval-compare-* 스크립트가 만든 결과 디렉터리 구조:
       new-korean/results_*.json
 
 사용:
-    uv run python eval_compare_table.py outputs/lm_eval_results/sft-smoke \
+    uv run python eval_compare_table.py outputs/lm_eval_results/sft-mini \
         --labels "prev=Base,new=SFT"
 """
 from __future__ import annotations

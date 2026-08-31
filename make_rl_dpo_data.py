@@ -7,13 +7,13 @@
   - 점수 함수:  ① CoT  블록 존재 ②  ###  헤더로 구조화된 결론  ③ 응답 길이
   - 베이스 모델 출력도 "rejected" 후보로 섞어서 데이터 다양성 확보
 
-출력:  data/train_rl-dpo.jsonl  (각 줄: {"prompt", "chosen", "rejected"})
-       data/sample_rl-dpo.jsonl  (디버깅용 50건)
+출력:  data/dpo-{mode}-out/train_rl-dpo.jsonl  (각 줄: {"prompt", "chosen", "rejected"})
+       data/dpo-{mode}-out/sample_rl-dpo.jsonl  (디버깅용 50건)
 
 사용:
-    uv run python make_rl_dpo_data.py --sft-model ./outputs/qwen2.5-1.5b-sft-merge \
+    uv run python make_rl_dpo_data.py --sft-model ./data/sft-full-out/merged \
         --base-model Qwen/Qwen2.5-1.5B-Instruct --num-prompts 1000 \
-        --out data/train_rl-dpo.jsonl
+        --out data/dpo-full-out/train_rl-dpo.jsonl
 """
 from __future__ import annotations
 
@@ -84,12 +84,12 @@ def score(resp: str) -> float:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--sft-model", default="./outputs/qwen2.5-1.5b-sft-merge")
+    ap.add_argument("--sft-model", default="./data/sft-full-out/merged")
     ap.add_argument("--base-model", default="Qwen/Qwen2.5-1.5B-Instruct")
     ap.add_argument("--train-jsonl", default="train.jsonl")
-    ap.add_argument("--out", default="data/full/train_rl-dpo.jsonl",
-                    help="smoke 용도면 data/smoke/ 아래로 지정할 것")
-    ap.add_argument("--sample-out", default="data/full/sample_rl-dpo.jsonl")
+    ap.add_argument("--out", default="data/dpo-full-out/train_rl-dpo.jsonl",
+                    help="mini 용도면 data/dpo-mini-out/ 아래로 지정할 것")
+    ap.add_argument("--sample-out", default="data/dpo-full-out/sample_rl-dpo.jsonl")
     ap.add_argument("--num-prompts", type=int, default=1000)
     ap.add_argument("--samples-per-prompt", type=int, default=4)
     ap.add_argument("--max-new-tokens", type=int, default=512)

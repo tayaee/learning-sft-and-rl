@@ -4,11 +4,11 @@ source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-full}" "$0" "$@") || exit 1
 
-if [ "$MODE" = "smoke" ]; then
-  SRC=./outputs/qwen2.5-1.5b-rl-orpo-smoke-merge/merged
-  REPO=tayaee/Qwen2.5-1.5B-Korean-ORPO-smoke
+if [ "$MODE" = "mini" ]; then
+  SRC=./data/orpo-mini-out/merged
+  REPO=tayaee/Qwen2.5-1.5B-Korean-ORPO-mini
 else
-  SRC=./outputs/qwen2.5-1.5b-rl-orpo-merge/merged
+  SRC=./data/orpo-full-out/merged
   REPO=tayaee/Qwen2.5-1.5B-Korean-ORPO
 fi
 

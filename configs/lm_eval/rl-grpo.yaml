@@ -1,5 +1,5 @@
 # lm-eval config — GRPO 모델
-lm_eval_model: ./outputs/qwen2.5-1.5b-rl-grpo-merge/merged
+lm_eval_model: ./data/grpo-full-out/merged
 lm_eval_tasks:
   - kobest_hellaswag
   - kobest_copa

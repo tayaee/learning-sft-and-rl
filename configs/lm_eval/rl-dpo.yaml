@@ -1,5 +1,5 @@
 # lm-eval config — DPO 모델
-lm_eval_model: ./outputs/qwen2.5-1.5b-rl-dpo-merge/merged
+lm_eval_model: ./data/dpo-full-out/merged
 lm_eval_tasks:
   - kobest_hellaswag
   - kobest_copa

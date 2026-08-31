@@ -4,12 +4,12 @@ source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
 
-if [ "$MODE" = "smoke" ]; then
-  SFT_MODEL=./outputs/qwen2.5-1.5b-sft-smoke-merge/merged
-  ORPO_MODEL=./outputs/qwen2.5-1.5b-rl-orpo-smoke-merge/merged
+if [ "$MODE" = "mini" ]; then
+  SFT_MODEL=./data/sft-mini-out/merged
+  ORPO_MODEL=./data/orpo-mini-out/merged
 else
-  SFT_MODEL=./outputs/qwen2.5-1.5b-sft-merge/merged
-  ORPO_MODEL=./outputs/qwen2.5-1.5b-rl-orpo-merge/merged
+  SFT_MODEL=./data/sft-full-out/merged
+  ORPO_MODEL=./data/orpo-full-out/merged
 fi
 
 echo "input: $SFT_MODEL, $ORPO_MODEL"

@@ -4,14 +4,14 @@ source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
 
-if [ "$MODE" = "smoke" ]; then
-  CFG=configs/qwen2.5-1.5b-rl-dpo-smoke.yaml
-  ADAPTER=./outputs/qwen2.5-1.5b-rl-dpo-smoke
-  OUT=./outputs/qwen2.5-1.5b-rl-dpo-smoke-merge
+if [ "$MODE" = "mini" ]; then
+  CFG=data/dpo-mini-config/qwen2.5-1.5b-rl-dpo-mini.yaml
+  ADAPTER=./data/dpo-mini-out/adapter
+  OUT=./data/dpo-mini-out
 else
-  CFG=configs/qwen2.5-1.5b-rl-dpo.yaml
-  ADAPTER=./outputs/qwen2.5-1.5b-rl-dpo
-  OUT=./outputs/qwen2.5-1.5b-rl-dpo-merge
+  CFG=data/dpo-full-config/qwen2.5-1.5b-rl-dpo.yaml
+  ADAPTER=./data/dpo-full-out/adapter
+  OUT=./data/dpo-full-out
 fi
 
 echo "input: $CFG, $ADAPTER"

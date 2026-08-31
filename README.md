@@ -38,51 +38,51 @@ Axolotl GRPO config, train, merge, 4-model comparison, lm-eval.
 How to run ORPO on top of the SFT'd model using the same `(prompt, chosen, rejected)`
 pairs as DPO — but **without a reference model**. Provides two modes:
 → See **[`rl-orpo-demo.md`](rl-orpo-demo.md)**.
-- **smoke test**: 20 pairs × `max_steps: 3` (~10분) — 파이프라인 점검용
+- **mini test**: 20 pairs × `max_steps: 3` (~10분) — 파이프라인 점검용
 - **full run**: 1000 pairs × 2 epochs (~1–2시간) — 휴리스틱 reward 기반 정량 평가 포함
 
 ## Stage diagrams
 
-각 스테이지는 **smoke**(파이프라인 점검)와 **full**(실전 학습) 두 흐름으로 실행한다.
+각 스테이지는 **mini**(파이프라인 점검)와 **full**(실전 학습) 두 흐름으로 실행한다.
 흐름마다 데이터·로그·출력 모델 디렉터리가 분리되어 있으므로 어느 순서로 실행해도
 서로 덮어쓰지 않는다. 아래 다이어그램의 각 박스에는 프로세스별 in/out 을 표시했고,
 바로 아래 코드 블록을 위에서부터 copy & paste 하면 그대로 따라간다.
 (검토 전용 스크립트 — `*review*.sh`, `*sanity-check*.sh` — 는 산출물이 없어 생략)
 
 > 공통 선행 조건: 모든 RL 스테이지(DPO/GRPO/ORPO)는 **같은 모드의 SFT merge 모델**이 필요하다.
-> smoke 흐름은 `sft-*-smoke` 산출물을, full 흐름은 `sft-*-full` 산출물을 사용한다.
+> mini 흐름은 `data/sft-mini-out/`, full 흐름은 `data/sft-full-out/` 의 산출물을 사용한다.
 
 ---
 
 ### SFT
 
-#### smoke flow (~10분)
+#### mini flow (~10분)
 
 ```
 [in]  Qwen/Qwen2.5-1.5B-Instruct (base)
-[in]  train.jsonl ──(앞 200건 자동 추출)──▶ data/smoke/train-sft.jsonl
+[in]  train.jsonl ──(앞 200건 자동 추출)──▶ data/sft-mini-out/train-sft.jsonl
    │
-   ├─ sft-06-run-axolotl.sh smoke        Axolotl LoRA train
-   │    in : configs/qwen2.5-1.5b-sft-smoke.yaml + data/smoke/train-sft.jsonl
-   │    out: outputs/qwen2.5-1.5b-sft-smoke/              (LoRA adapter)
+   ├─ ./sft-mini-06-run-axolotl-mini.sh    Axolotl LoRA train
+   │    in : data/sft-mini-config/qwen2.5-1.5b-sft-mini.yaml + data/sft-mini-in/train-sft.jsonl
+   │    out: data/sft-mini-out/adapter/                       (LoRA adapter)
    │
-   ├─ sft-07-merge.sh smoke               axolotl merge-lora
-   │    in : outputs/qwen2.5-1.5b-sft-smoke/
-   │    out: outputs/qwen2.5-1.5b-sft-smoke-merge/merged/ (HF model)
+   ├─ ./sft-mini-07-merge-mini.sh           axolotl merge-lora
+   │    in : data/sft-mini-out/adapter/
+   │    out: data/sft-mini-out/merged/                         (HF model)
    │
-   ├─ query_sft.py --mode smoke           추론 테스트
-   │    in : .../qwen2.5-1.5b-sft-smoke-merge/merged/
+   ├─ uv run query_sft.py --mode mini       추론 테스트
+   │    in : data/sft-mini-out/merged/
    │
-   └─ sft-11-lm-eval-sft.sh smoke         lm-eval (선택)
-        in : .../qwen2.5-1.5b-sft-smoke-merge/merged/
-        out: outputs/lm_eval_results/sft-smoke/
+   └─ ./sft-mini-11-lm-eval-sft-mini.sh     lm-eval (선택)
+        in : data/sft-mini-out/merged/
+        out: outputs/lm_eval_results/sft-mini/
 ```
 
 ```bash
-./sft-06-run-axolotl.sh smoke
-./sft-07-merge.sh smoke
-uv run query_sft.py --mode smoke "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
-# (선택) ./sft-11-lm-eval-sft.sh smoke
+./sft-mini-06-run-axolotl-mini.sh
+./sft-mini-07-merge-mini.sh
+uv run query_sft.py --mode mini "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+# (선택) ./sft-mini-11-lm-eval-sft-mini.sh
 ```
 
 #### full flow (~수 시간)
@@ -91,260 +91,268 @@ uv run query_sft.py --mode smoke "방정식 x^2 + 5x + 6 = 0 의 해를 구하�
 [in]  Qwen/Qwen2.5-1.5B-Instruct (base)
 [in]  train.jsonl (50k Korean CoT, chat format)
    │
-   ├─ sft-06-run-axolotl.sh full         Axolotl LoRA train
-   │    in : configs/qwen2.5-1.5b-sft.yaml + train.jsonl
-   │    out: outputs/qwen2.5-1.5b-sft/                    (LoRA adapter)
+   ├─ ./sft-06-run-axolotl.sh               Axolotl LoRA train
+   │    in : data/sft-full-config/qwen2.5-1.5b-sft.yaml + train.jsonl
+   │    out: data/sft-full-out/adapter/                       (LoRA adapter)
    │
-   ├─ sft-07-merge.sh full                axolotl merge-lora
-   │    in : outputs/qwen2.5-1.5b-sft/
-   │    out: outputs/qwen2.5-1.5b-sft-merge/merged/       (HF model)
+   ├─ ./sft-07-merge.sh                      axolotl merge-lora
+   │    in : data/sft-full-out/adapter/
+   │    out: data/sft-full-out/merged/                        (HF model)
    │
-   ├─ query_sft.py --mode full            추론 테스트
-   │    in : .../qwen2.5-1.5b-sft-merge/merged/
+   ├─ uv run query_sft.py --mode full        추론 테스트
+   │    in : data/sft-full-out/merged/
    │
-   ├─ sft-08-upload-to-hf.sh full         HF Hub 업로드 (선택)
-   │    in : .../qwen2.5-1.5b-sft-merge/merged/
-   │    out: tayaee/Qwen2.5-1.5B-Instruct-ko-Reasoning-alpha
+   ├─ ./sft-13-upload-to-hf.sh               HF Hub 업로드 (선택)
+   │    in : data/sft-full-out/merged/
+   │    out: tayaee/Qwen2.5-1.5B-Korean-SFT
    │
-   └─ sft-11-lm-eval-sft.sh full          lm-eval (선택)
-        in : .../qwen2.5-1.5b-sft-merge/merged/
+   └─ ./sft-11-lm-eval-sft.sh                lm-eval (선택)
+        in : data/sft-full-out/merged/
         out: outputs/lm_eval_results/sft-full/
 ```
 
 ```bash
-./sft-06-run-axolotl.sh full
-./sft-07-merge.sh full
+./sft-06-run-axolotl.sh
+./sft-07-merge.sh
 uv run query_sft.py --mode full "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
-# (선택) ./sft-08-upload-to-hf.sh full
-# (선택) ./sft-11-lm-eval-sft.sh full
+# (선택) ./sft-13-upload-to-hf.sh
+# (선택) ./sft-11-lm-eval-sft.sh
 ```
 
 ---
 
 ### DPO (from SFT)
 
-#### smoke flow (~30분, SFT-smoke merge 필요)
+#### mini flow (~30분, SFT-mini merge 필요)
 
 ```
-[in]  SFT-smoke merge 모델  outputs/qwen2.5-1.5b-sft-smoke-merge/merged/
+[in]  SFT-mini merge 모델  data/sft-mini-out/merged/
 [in]  train.jsonl (프롬프트 소스) + Qwen/Qwen2.5-1.5B-Instruct (rejected 후보)
    │
-   ├─ rl-dpo-01-make-rl-dpo-data.sh smoke    rejection sampling 으로 선호 쌍 생성
-   │    in : SFT-smoke merge 모델 + base 모델
-   │    out: data/smoke/train_rl-dpo.jsonl  (50 pairs)
-   │         data/smoke/sample_rl-dpo.jsonl (디버깅용 샘플)
+   ├─ ./rl-dpo-mini-01-make-rl-dpo-data-mini.sh   rejection sampling 으로 선호 쌍 생성
+   │    in : SFT-mini merge 모델 + base 모델
+   │    out: data/dpo-mini-out/train_rl-dpo.jsonl  (50 pairs)
+   │         data/dpo-mini-out/sample_rl-dpo.jsonl (디버깅용 샘플)
    │
-   ├─ rl-dpo-04-run-axolotl.sh smoke         Axolotl DPO train
-   │    in : configs/qwen2.5-1.5b-rl-dpo-smoke.yaml + data/smoke/train_rl-dpo.jsonl
-   │    out: outputs/qwen2.5-1.5b-rl-dpo-smoke/           (LoRA adapter)
+   ├─ ./rl-dpo-mini-04-run-axolotl-mini.sh        Axolotl DPO train
+   │    in : data/dpo-mini-config/qwen2.5-1.5b-rl-dpo-mini.yaml + data/dpo-mini-in/train_rl-dpo.jsonl
+   │    out: data/dpo-mini-out/adapter/                          (LoRA adapter)
    │
-   ├─ rl-dpo-06-merge.sh smoke               axolotl merge-lora
-   │    in : outputs/qwen2.5-1.5b-rl-dpo-smoke/
-   │    out: outputs/qwen2.5-1.5b-rl-dpo-smoke-merge/merged/
+   ├─ ./rl-dpo-mini-06-merge-mini.sh              axolotl merge-lora
+   │    in : data/dpo-mini-out/adapter/
+   │    out: data/dpo-mini-out/merged/
    │
-   ├─ rl-dpo-05-test-models.sh smoke         단일 추론 테스트
-   │    in : .../qwen2.5-1.5b-rl-dpo-smoke-merge/merged/
+   ├─ ./rl-dpo-mini-05-test-models-mini.sh        단일 추론 테스트
+   │    in : data/dpo-mini-out/merged/
    │
-   └─ rl-dpo-09-lm-eval-rl-dpo.sh smoke      lm-eval (선택)
-        in : .../qwen2.5-1.5b-rl-dpo-smoke-merge/merged/
-        out: outputs/lm_eval_results/rl-dpo-smoke/
+   └─ ./rl-dpo-mini-09-lm-eval-rl-dpo-mini.sh     lm-eval (선택)
+        in : data/dpo-mini-out/merged/
+        out: outputs/lm_eval_results/rl-dpo-mini/
 ```
 
 ```bash
-./rl-dpo-01-make-rl-dpo-data.sh smoke
-./rl-dpo-04-run-axolotl.sh smoke
-./rl-dpo-06-merge.sh smoke
-./rl-dpo-05-test-models.sh smoke "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
-# (선택) ./rl-dpo-09-lm-eval-rl-dpo.sh smoke
+./rl-dpo-mini-01-make-rl-dpo-data-mini.sh
+./rl-dpo-mini-04-run-axolotl-mini.sh
+./rl-dpo-mini-06-merge-mini.sh
+./rl-dpo-mini-05-test-models-mini.sh "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+# (선택) ./rl-dpo-mini-09-lm-eval-rl-dpo-mini.sh
 ```
 
 #### full flow (~1–3시간, SFT-full merge 필요)
 
 ```
-[in]  SFT-full merge 모델  outputs/qwen2.5-1.5b-sft-merge/merged/
+[in]  SFT-full merge 모델  data/sft-full-out/merged/
 [in]  train.jsonl (프롬프트 소스) + Qwen/Qwen2.5-1.5B-Instruct (rejected 후보)
    │
-   ├─ rl-dpo-01-make-rl-dpo-data.sh full
+   ├─ ./rl-dpo-01-make-rl-dpo-data.sh
    │    in : SFT-full merge 모델 + base 모델
-   │    out: data/full/train_rl-dpo.jsonl  (1000 pairs)
-   │         data/full/sample_rl-dpo.jsonl
+   │    out: data/dpo-full-out/train_rl-dpo.jsonl  (1000 pairs)
+   │         data/dpo-full-out/sample_rl-dpo.jsonl
    │
-   ├─ rl-dpo-04-run-axolotl.sh full
-   │    in : configs/qwen2.5-1.5b-rl-dpo.yaml + data/full/train_rl-dpo.jsonl
-   │    out: outputs/qwen2.5-1.5b-rl-dpo/                 (LoRA adapter)
+   ├─ ./rl-dpo-04-run-axolotl.sh
+   │    in : data/dpo-full-config/qwen2.5-1.5b-rl-dpo.yaml + data/dpo-full-in/train_rl-dpo.jsonl
+   │    out: data/dpo-full-out/adapter/                            (LoRA adapter)
    │
-   ├─ rl-dpo-06-merge.sh full
-   │    in : outputs/qwen2.5-1.5b-rl-dpo/
-   │    out: outputs/qwen2.5-1.5b-rl-dpo-merge/merged/
+   ├─ ./rl-dpo-06-merge.sh
+   │    in : data/dpo-full-out/adapter/
+   │    out: data/dpo-full-out/merged/
    │
-   ├─ rl-dpo-05-test-models.sh full          단일 추론 테스트
-   │    in : .../qwen2.5-1.5b-rl-dpo-merge/merged/
+   ├─ ./rl-dpo-05-test-models.sh            단일 추론 테스트
+   │    in : data/dpo-full-out/merged/
    │
-   └─ rl-dpo-09-lm-eval-rl-dpo.sh full       lm-eval (선택)
-        in : .../qwen2.5-1.5b-rl-dpo-merge/merged/
+   └─ ./rl-dpo-09-lm-eval-rl-dpo.sh         lm-eval (선택)
+        in : data/dpo-full-out/merged/
         out: outputs/lm_eval_results/rl-dpo-full/
 ```
 
 ```bash
-./rl-dpo-01-make-rl-dpo-data.sh full
-./rl-dpo-04-run-axolotl.sh full
-./rl-dpo-06-merge.sh full
-./rl-dpo-05-test-models.sh full "피타고라스 정리를 증명하시오."
-# (선택) ./rl-dpo-09-lm-eval-rl-dpo.sh full
+./rl-dpo-01-make-rl-dpo-data.sh
+./rl-dpo-04-run-axolotl.sh
+./rl-dpo-06-merge.sh
+./rl-dpo-05-test-models.sh "피타고라스 정리를 증명하시오."
+# (선택) ./rl-dpo-09-lm-eval-rl-dpo.sh
 ```
 
 ---
 
 ### GRPO (from SFT)
 
-> 사전 준비: `data/smoke/sample_rl-grpo.jsonl` (20 prompts),
-> `data/full/sample_rl-grpo.jsonl` (확장 버전) — prompt-only JSONL 을 직접 준비한다.
+> 사전 준비: `data/grpo-mini-out/sample_rl-grpo.jsonl` (20 prompts),
+> `data/grpo-full-out/sample_rl-grpo.jsonl` (확장 버전) — prompt-only JSONL 을 직접 준비한다.
 
-#### smoke flow (~20분, SFT-smoke merge 필요)
+#### mini flow (~20분, SFT-mini merge 필요)
 
 ```
-[in]  SFT-smoke merge 모델  outputs/qwen2.5-1.5b-sft-smoke-merge/merged/
-[in]  data/smoke/sample_rl-grpo.jsonl (prompt only) + reward_fn.py
+[in]  SFT-mini merge 모델  data/sft-mini-out/merged/
+[in]  data/grpo-mini-out/sample_rl-grpo.jsonl (prompt only) + reward_fn.py
    │
-   ├─ rl-grpo-04-run-axolotl.sh smoke        Axolotl GRPO train
-   │    in : configs/qwen2.5-1.5b-rl-grpo-smoke.yaml
-   │          + data/smoke/sample_rl-grpo.jsonl + reward_fn.py
-   │    out: outputs/qwen2.5-1.5b-rl-grpo-smoke/          (LoRA adapter)
+   ├─ ./rl-grpo-mini-04-run-axolotl-mini.sh       Axolotl GRPO train
+   │    in : data/grpo-mini-config/qwen2.5-1.5b-rl-grpo-mini.yaml
+   │          + data/grpo-mini-in/sample_rl-grpo.jsonl + reward_fn.py
+   │    out: data/grpo-mini-out/adapter/                         (LoRA adapter)
    │
-   ├─ rl-grpo-06-merge.sh smoke              axolotl merge-lora
-   │    in : outputs/qwen2.5-1.5b-rl-grpo-smoke/
-   │    out: outputs/qwen2.5-1.5b-rl-grpo-smoke-merge/merged/
+   ├─ ./rl-grpo-mini-06-merge-mini.sh             axolotl merge-lora
+   │    in : data/grpo-mini-out/adapter/
+   │    out: data/grpo-mini-out/merged/
    │
-   ├─ rl-grpo-05-test-model.sh smoke         단일 추론 테스트
-   │    in : .../qwen2.5-1.5b-rl-grpo-smoke-merge/merged/
+   ├─ ./rl-grpo-mini-05-test-model-mini.sh        단일 추론 테스트
+   │    in : data/grpo-mini-out/merged/
    │
-   └─ rl-grpo-09-lm-eval-rl-grpo.sh smoke    lm-eval (선택)
-        in : .../qwen2.5-1.5b-rl-grpo-smoke-merge/merged/
-        out: outputs/lm_eval_results/rl-grpo-smoke/
+   └─ ./rl-grpo-mini-09-lm-eval-rl-grpo-mini.sh   lm-eval (선택)
+        in : data/grpo-mini-out/merged/
+        out: outputs/lm_eval_results/rl-grpo-mini/
 ```
 
 ```bash
-./rl-grpo-04-run-axolotl.sh smoke
-./rl-grpo-06-merge.sh smoke
-./rl-grpo-05-test-model.sh smoke "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
-# (선택) ./rl-grpo-09-lm-eval-rl-grpo.sh smoke
+./rl-grpo-mini-04-run-axolotl-mini.sh
+./rl-grpo-mini-06-merge-mini.sh
+./rl-grpo-mini-05-test-model-mini.sh "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+# (선택) ./rl-grpo-mini-09-lm-eval-rl-grpo-mini.sh
 ```
 
 #### full flow (~1–2시간+, SFT-full merge 필요)
 
 ```
-[in]  SFT-full merge 모델  outputs/qwen2.5-1.5b-sft-merge/merged/
-[in]  data/full/sample_rl-grpo.jsonl (prompt only) + reward_fn.py
+[in]  SFT-full merge 모델  data/sft-full-out/merged/
+[in]  data/grpo-full-out/sample_rl-grpo.jsonl (prompt only) + reward_fn.py
    │
-   ├─ rl-grpo-04-run-axolotl.sh full
-   │    in : configs/qwen2.5-1.5b-rl-grpo.yaml
-   │          + data/full/sample_rl-grpo.jsonl + reward_fn.py
-   │    out: outputs/qwen2.5-1.5b-rl-grpo/                (LoRA adapter)
+   ├─ ./rl-grpo-04-run-axolotl.sh
+   │    in : data/grpo-full-config/qwen2.5-1.5b-rl-grpo.yaml
+   │          + data/grpo-full-in/sample_rl-grpo.jsonl + reward_fn.py
+   │    out: data/grpo-full-out/adapter/                         (LoRA adapter)
    │
-   ├─ rl-grpo-06-merge.sh full
-   │    in : outputs/qwen2.5-1.5b-rl-grpo/
-   │    out: outputs/qwen2.5-1.5b-rl-grpo-merge/merged/
+   ├─ ./rl-grpo-06-merge.sh
+   │    in : data/grpo-full-out/adapter/
+   │    out: data/grpo-full-out/merged/
    │
-   ├─ rl-grpo-05-test-model.sh full          단일 추론 테스트
-   │    in : .../qwen2.5-1.5b-rl-grpo-merge/merged/
+   ├─ ./rl-grpo-05-test-model.sh            단일 추론 테스트
+   │    in : data/grpo-full-out/merged/
    │
-   └─ rl-grpo-09-lm-eval-rl-grpo.sh full     lm-eval (선택)
-        in : .../qwen2.5-1.5b-rl-grpo-merge/merged/
+   └─ ./rl-grpo-09-lm-eval-rl-grpo.sh       lm-eval (선택)
+        in : data/grpo-full-out/merged/
         out: outputs/lm_eval_results/rl-grpo-full/
 ```
 
 ```bash
-./rl-grpo-04-run-axolotl.sh full
-./rl-grpo-06-merge.sh full
-./rl-grpo-05-test-model.sh full "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
-# (선택) ./rl-grpo-09-lm-eval-rl-grpo.sh full
+./rl-grpo-04-run-axolotl.sh
+./rl-grpo-06-merge.sh
+./rl-grpo-05-test-model.sh "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
+# (선택) ./rl-grpo-09-lm-eval-rl-grpo.sh
 ```
 
 ---
 
 ### ORPO (from SFT, reference model 불필요)
 
-#### smoke flow (~15분, DPO-smoke 데이터 필요)
+#### mini flow (~15분, DPO-mini 데이터 필요)
 
 ```
-[in]  data/smoke/train_rl-dpo.jsonl (DPO-smoke 선호 쌍 재사용)
+[in]  data/dpo-mini-out/train_rl-dpo.jsonl (DPO-mini 선호 쌍 재사용)
    │
-   ├─ rl-orpo-01-make-orpo-data.sh smoke     DPO → ORPO 메시지 리스트 포맷 변환
-   │    in : data/smoke/train_rl-dpo.jsonl
-   │    out: data/smoke/train_rl-orpo.jsonl (20 pairs)
+   ├─ ./rl-orpo-mini-01-make-orpo-data-mini.sh    DPO → ORPO 메시지 리스트 포맷 변환
+   │    in : data/dpo-mini-out/train_rl-dpo.jsonl
+   │    out: data/orpo-mini-out/train_rl-orpo.jsonl (20 pairs)
    │
-   ├─ rl-orpo-04-run-axolotl.sh smoke        Axolotl ORPO train
-   │    in : configs/qwen2.5-1.5b-rl-orpo-smoke.yaml + data/smoke/train_rl-orpo.jsonl
-   │    out: outputs/qwen2.5-1.5b-rl-orpo-smoke/          (LoRA adapter)
+   ├─ ./rl-orpo-mini-04-run-axolotl-mini.sh       Axolotl ORPO train
+   │    in : data/orpo-mini-config/qwen2.5-1.5b-rl-orpo-mini.yaml + data/orpo-mini-in/train_rl-orpo.jsonl
+   │    out: data/orpo-mini-out/adapter/                            (LoRA adapter)
    │
-   ├─ rl-orpo-05-merge.sh smoke              axolotl merge-lora
-   │    in : outputs/qwen2.5-1.5b-rl-orpo-smoke/
-   │    out: outputs/qwen2.5-1.5b-rl-orpo-smoke-merge/merged/
+   ├─ ./rl-orpo-mini-05-merge-mini.sh             axolotl merge-lora
+   │    in : data/orpo-mini-out/adapter/
+   │    out: data/orpo-mini-out/merged/
    │
-   ├─ rl-orpo-06-test-model.sh smoke         단일 추론 테스트
-   │    in : .../qwen2.5-1.5b-rl-orpo-smoke-merge/merged/
+   ├─ ./rl-orpo-mini-06-test-model-mini.sh        단일 추론 테스트
+   │    in : data/orpo-mini-out/merged/
    │
-   └─ rl-orpo-08-reward-eval.sh smoke        SFT vs ORPO reward 정량 비교 (선택)
-        in : SFT-smoke merge + ORPO-smoke merge 모델
-        out: outputs/eval_results/orpo-reward-smoke.jsonl
+   └─ ./rl-orpo-mini-08-reward-eval-mini.sh       SFT vs ORPO reward 정량 비교 (선택)
+        in : SFT-mini merge + ORPO-mini merge 모델
+        out: outputs/eval_results/orpo-reward-mini.jsonl
 ```
 
 ```bash
-./rl-orpo-01-make-orpo-data.sh smoke
-./rl-orpo-04-run-axolotl.sh smoke
-./rl-orpo-05-merge.sh smoke
-./rl-orpo-06-test-model.sh smoke
-# (선택) ./rl-orpo-08-reward-eval.sh smoke
+./rl-orpo-mini-01-make-orpo-data-mini.sh
+./rl-orpo-mini-04-run-axolotl-mini.sh
+./rl-orpo-mini-05-merge-mini.sh
+./rl-orpo-mini-06-test-model-mini.sh
+# (선택) ./rl-orpo-mini-08-reward-eval-mini.sh
 ```
 
 #### full flow (~1–2시간, DPO-full 데이터 필요)
 
 ```
-[in]  data/full/train_rl-dpo.jsonl (DPO-full 선호 쌍 재사용)
+[in]  data/dpo-full-out/train_rl-dpo.jsonl (DPO-full 선호 쌍 재사용)
    │
-   ├─ rl-orpo-01-make-orpo-data.sh full
-   │    in : data/full/train_rl-dpo.jsonl
-   │    out: data/full/train_rl-orpo.jsonl (1000 pairs)
+   ├─ ./rl-orpo-01-make-orpo-data.sh
+   │    in : data/dpo-full-out/train_rl-dpo.jsonl
+   │    out: data/orpo-full-out/train_rl-orpo.jsonl (1000 pairs)
    │
-   ├─ rl-orpo-04-run-axolotl.sh full
-   │    in : configs/qwen2.5-1.5b-rl-orpo.yaml + data/full/train_rl-orpo.jsonl
-   │    out: outputs/qwen2.5-1.5b-rl-orpo/                (LoRA adapter)
+   ├─ ./rl-orpo-04-run-axolotl.sh
+   │    in : data/orpo-full-config/qwen2.5-1.5b-rl-orpo.yaml + data/orpo-full-in/train_rl-orpo.jsonl
+   │    out: data/orpo-full-out/adapter/                            (LoRA adapter)
    │
-   ├─ rl-orpo-05-merge.sh full
-   │    in : outputs/qwen2.5-1.5b-rl-orpo/
-   │    out: outputs/qwen2.5-1.5b-rl-orpo-merge/merged/
+   ├─ ./rl-orpo-05-merge.sh
+   │    in : data/orpo-full-out/adapter/
+   │    out: data/orpo-full-out/merged/
    │
-   ├─ rl-orpo-06-test-model.sh full          단일 추론 테스트
-   │    in : .../qwen2.5-1.5b-rl-orpo-merge/merged/
+   ├─ ./rl-orpo-06-test-model.sh            단일 추론 테스트
+   │    in : data/orpo-full-out/merged/
    │
-   ├─ rl-orpo-08-reward-eval.sh full         SFT vs ORPO reward 정량 비교
+   ├─ ./rl-orpo-08-reward-eval.sh           SFT vs ORPO reward 정량 비교
    │    in : SFT-full merge + ORPO-full merge 모델
    │    out: outputs/eval_results/orpo-reward-full.jsonl
    │
-   └─ rl-orpo-09-lm-eval-rl-orpo.sh full     lm-eval (선택)
-        in : .../qwen2.5-1.5b-rl-orpo-merge/merged/
+   └─ ./rl-orpo-09-lm-eval-rl-orpo.sh       lm-eval (선택)
+        in : data/orpo-full-out/merged/
         out: outputs/lm_eval_results/rl-orpo-full/
 ```
 
 ```bash
-./rl-orpo-01-make-orpo-data.sh full
-./rl-orpo-04-run-axolotl.sh full
-./rl-orpo-05-merge.sh full
-./rl-orpo-06-test-model.sh full
-./rl-orpo-08-reward-eval.sh full
-# (선택) ./rl-orpo-09-lm-eval-rl-orpo.sh full
+./rl-orpo-01-make-orpo-data.sh
+./rl-orpo-04-run-axolotl.sh
+./rl-orpo-05-merge.sh
+./rl-orpo-06-test-model.sh
+./rl-orpo-08-reward-eval.sh
+# (선택) ./rl-orpo-09-lm-eval-rl-orpo.sh
 ```
 
 
 ## Repository layout
 
 ```
-configs/                       Axolotl YAML configs (sft / rl-dpo / rl-grpo / rl-orpo / lm_eval)
-data/                          Training & sample JSONLs
-sft-*.sh / rl-dpo-*.sh / rl-grpo-*.sh    Per-stage driver scripts
-query-*.py                     Inference scripts (base / sft / rl-dpo / rl-grpo)
+data/
+├── train.jsonl                                SFT 학습용 원천 (root, 변경 없음)
+├── {sft,dpo,orpo,grpo}-{full,mini}-{in,config,out}/   stage × mode 별 3분리 구조
+│     in/      : 입력 데이터 (이전 stage 의 out 또는 외부 소스에 대한 symbolic link)
+│     config/  : axolotl yaml
+│     out/     : 이 stage 가 생성한 모든 산출물 (jsonl + adapter/ + merged/ + dataset_prepared/)
+└── ...
+
+configs/lm_eval/                lm-eval 용 YAML (변경 없음)
+outputs/lm_eval_results/        평가 산출물 (학습 산출물은 data/{stage}-{mode}-out/ 로 이동)
+
+sft-*.sh / rl-dpo-*.sh / rl-grpo-*.sh / rl-orpo-*.sh    Per-stage driver scripts (full / mini)
+query-*.py                     Inference scripts (base / sft / rl-dpo / rl-grpo / rl-orpo)
 reward_fn.py                   Rule-based rewards for GRPO
-sft-12 / rl-{dpo,grpo,orpo}-10-eval-compare.sh    이전/새 모델 2개 평가(tinyBenchmarks + KO-BEST) 비교표
 eval_compare_table.py          eval-compare 결과 → markdown 비교표 생성
 make_rl_dpo_data.py            Script to build DPO preference pairs
 make_rl_orpo_data.py           Script to build ORPO data (reuses DPO pairs)
@@ -354,12 +362,11 @@ sft-demo.md / rl-dpo-demo.md / rl-grpo-demo.md / rl-orpo-demo.md    Step-by-step
 
 ## Quick start
 
-모든 학습/데이터 스크립트는 첫 인자로 `smoke | full` 을 반드시 받으며,
-데이터(`data/smoke/`, `data/full/`)·로그·출력 모델이 모드별로 분리되어 있어
+모든 학습/데이터 스크립트는 첫 인자로 `mini | full` 을 반드시 받으며,
+데이터(`data/{stage}-{mode}-out/`)·로그·출력 모델이 모드별로 분리되어 있어
 어떤 순서로 실행해도 서로 덮어쓰지 않는다.
 
-모드 지정 스크립트에는 `<script>-smoke.sh` / `<script>-full.sh` 래퍼도 있다
-(예: `./sft-06-run-axolotl-full.sh` ≡ `./sft-06-run-axolotl.sh full`).
+mini 흐름용 래퍼도 있다 (예: `./sft-mini-06-run-axolotl-mini.sh` ≡ `./sft-06-run-axolotl.sh mini`).
 
 ```bash
 # 1) SFT
@@ -368,22 +375,22 @@ sft-demo.md / rl-dpo-demo.md / rl-grpo-demo.md / rl-orpo-demo.md    Step-by-step
 uv run query_sft.py --mode full "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
 
 # 2) DPO (requires SFT merge output of the same mode)
-./rl-dpo-01-make-rl-dpo-data.sh full      # → data/full/train_rl-dpo.jsonl
+./rl-dpo-01-make-rl-dpo-data.sh full      # → data/dpo-full-out/train_rl-dpo.jsonl
 ./rl-dpo-04-run-axolotl.sh full
 ./rl-dpo-06-merge.sh full
 uv run query_rl_dpo.py --mode full "피타고라스 정리를 증명하시오."
 
 # 3) GRPO (requires SFT merge output)
-./rl-grpo-04-run-axolotl.sh full          # data/full/sample_rl-grpo.jsonl 사용
+./rl-grpo-04-run-axolotl.sh full          # data/grpo-full-in/sample_rl-grpo.jsonl 사용
 ./rl-grpo-06-merge.sh full
 uv run query_rl_grpo.py --mode full "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
 
-# 4) ORPO — smoke 으로 점검 후 full 실행 (requires DPO data of the same mode)
-./rl-dpo-01-make-rl-dpo-data.sh smoke     # → data/smoke/train_rl-dpo.jsonl
-./rl-orpo-01-make-orpo-data.sh smoke      # → data/smoke/train_rl-orpo.jsonl
-./rl-orpo-04-run-axolotl.sh smoke && \
-  ./rl-orpo-05-merge.sh smoke && ./rl-orpo-06-test-model.sh smoke
-./rl-orpo-01-make-orpo-data.sh full       # → data/full/train_rl-orpo.jsonl
+# 4) ORPO — mini 으로 점검 후 full 실행 (requires DPO data of the same mode)
+./rl-dpo-mini-01-make-rl-dpo-data-mini.sh     # → data/dpo-mini-out/train_rl-dpo.jsonl
+./rl-orpo-mini-01-make-orpo-data-mini.sh      # → data/orpo-mini-out/train_rl-orpo.jsonl
+./rl-orpo-mini-04-run-axolotl-mini.sh && \
+  ./rl-orpo-mini-05-merge-mini.sh && ./rl-orpo-mini-06-test-model-mini.sh
+./rl-orpo-01-make-orpo-data.sh full       # → data/orpo-full-out/train_rl-orpo.jsonl
 ./rl-orpo-04-run-axolotl.sh full && ./rl-orpo-05-merge.sh full && \
   ./rl-orpo-08-reward-eval.sh full
 
@@ -405,7 +412,7 @@ on before running its scripts.
 - 비교 대상: SFT=Base, DPO/GRPO/ORPO=같은 모드의 SFT merge 모델
 
 ```bash
-./sft-12-eval-compare.sh smoke        # Base vs SFT-smoke
+./sft-mini-12-eval-compare-mini.sh        # Base vs SFT-mini
 ./rl-dpo-10-eval-compare.sh full      # SFT(full) vs DPO(full)
 # → outputs/lm_eval_results/<stage>-<mode>/comparison-table.md 에 표 저장
 ```

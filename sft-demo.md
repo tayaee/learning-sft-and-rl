@@ -28,11 +28,11 @@ ls ~/.cache/huggingface/hub/ | grep Qwen2.5-1.5B-Instruct
 
 ---
 
-> **모드 규약**: 학습/merge/추론 스크립트는 `smoke` 또는 `full` 을 **반드시 인자로 지정**해야 합니다.
-> - `smoke`: 파이프라인 점검용 (소량 데이터 + max_steps 3~10, 수분 내 완주)
+> **모드 규약**: 학습/merge/추론 스크립트는 `mini` 또는 `full` 을 **반드시 인자로 지정**해야 합니다.
+> - `mini`: 파이프라인 점검용 (소량 데이터 + max_steps 3~10, 수분 내 완주)
 > - `full`: 실제 학습 (기존과 동일한 full 설정)
-> 예: `./sft-06-run-axolotl-smoke.sh`(또는 `./sft-06-run-axolotl.sh smoke`) → `./sft-07-merge-smoke.sh` → `uv run query_sft.py --mode smoke "..."`
-> 모드 지정 스크립트에는 `<script>-smoke.sh` / `<script>-full.sh` 래퍼가 준비되어 있다.
+> 예: `./sft-mini-06-run-axolotl-mini.sh`(또는 `./sft-06-run-axolotl.sh mini`) → `./sft-mini-07-merge-mini.sh` → `uv run query_sft.py --mode mini "..."`
+> 모드 지정 스크립트에는 `<script>-mini.sh` / `<script>-full.sh` 래퍼가 준비되어 있다.
 
 ## 1. 베이스 모델 sanity check (1분)
 
@@ -54,12 +54,15 @@ head -1 train.jsonl | uv run python -m json.tool | head -10
 wc -l train.jsonl               # 50000
 ```
 
+> **mini 모드 학습용 데이터**는 root `train.jsonl` 의 앞 200건을 자동 추출하여
+> `data/sft-mini-out/train-sft.jsonl` 로 저장한다. (mini 스크립트가 자동 처리)
+
 ---
 
 ## 3. axolotl config 검증 (1분)
 
 ```bash
-cat configs/qwen2.5-1.5b-sft.yaml | head -20
+cat data/sft-full-config/qwen2.5-1.5b-sft.yaml | head -20
 ```
 
 핵심 파라미터:
@@ -79,15 +82,16 @@ cd /home/user1/git/learning-sft-and-rl
 # 모니터링 (별도 터미널)
 watch -n 5 nvidia-smi
 
-# 학습 시작
-uv run axolotl train configs/qwen2.5-1.5b-sft.yaml 2>&1 | tee logs/sft.log
+# 학습 시작 (full 모드)
+./sft-06-run-axolotl.sh
+# 또는: uv run axolotl train data/sft-full-config/qwen2.5-1.5b-sft.yaml 2>&1 | tee logs/sft.log
 ```
 
 **체크 포인트**:
 - 첫 10 step 안에 GPU 메모리 ~14–18 GB 점유
 - `logging_steps: 10` → loss 가 10 step마다 출력
 - 최종 loss 1.5–2.0 대로 떨어지면 정상
-- 완료 시 `./outputs/qwen2.5-1.5b-sft/` 에 **LoRA 어댑터만** 저장됨
+- 완료 시 `data/sft-full-out/adapter/` 에 **LoRA 어댑터만** 저장됨
   (`adapter_config.json`, `adapter_model.safetensors`)
 - merge된 모델은 별도 단계에서 생성 (Stage 5 참고)
 
@@ -107,20 +111,22 @@ tail -f logs/sft.log                  # 다른 터미널에서
 ```bash
 cd /home/user1/git/learning-sft-and-rl
 
-uv run axolotl merge-lora configs/qwen2.5-1.5b-sft.yaml \
-  --lora-model-dir ./outputs/qwen2.5-1.5b-sft \
-  --output-dir    ./outputs/qwen2.5-1.5b-sft-merge
+./sft-07-merge.sh
+# 또는:
+# uv run axolotl merge-lora data/sft-full-config/qwen2.5-1.5b-sft.yaml \
+#   --lora-model-dir ./data/sft-full-out/adapter \
+#   --output-dir    ./data/sft-full-out
 ```
 
 **체크 포인트**:
 - 명령어 옵션명은 `--lora-model-dir`, `--output-dir` (언더스코어 아닌 대시) — fire CLI 규약
 - axolotl은 항상 `output_dir` 하위에 `merged/` 폴더를 만들어 저장
-  → 최종 경로: `./outputs/qwen2.5-1.5b-sft-merge/merged/`
+  → 최종 경로: `./data/sft-full-out/merged/`
 - 로그 끝에 `Applied LoRA to N/338 tensors` 형태의 메시지가 나오면 성공 (보통 20–30초)
 
 생성된 폴더 확인:
 ```bash
-ls outputs/qwen2.5-1.5b-sft-merge/merged/   # config.json, model.safetensors, tokenizer.* 등
+ls data/sft-full-out/merged/   # config.json, model.safetensors, tokenizer.* 등
 ```
 
 ---
@@ -129,7 +135,7 @@ ls outputs/qwen2.5-1.5b-sft-merge/merged/   # config.json, model.safetensors, to
 
 ```bash
 # merge 폴더 확인
-ls outputs/qwen2.5-1.5b-sft-merge/merged/
+ls data/sft-full-out/merged/
 
 # 추론
 uv run query_sft.py --mode full "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
@@ -176,7 +182,7 @@ uv run query_sft.py --mode full
 ./sft-10-lm-eval-base.sh
 
 # SFT 점수
-./sft-11-lm-eval-sft.sh full        # smoke 면 full 대신 smoke → outputs/lm_eval_results/sft-full/
+./sft-11-lm-eval-sft.sh        # mini 면 ./sft-mini-11-lm-eval-sft-mini.sh → outputs/lm_eval_results/sft-{mode}/
 ```
 
 평가는 다음을 포함:
@@ -213,7 +219,7 @@ uv run query_sft.py --mode full
 | `CUDA OOM` | `micro_batch_size: 4` → `2` 로 줄이기 |
 | `torch==2.12.1 not found` | `UV_TORCH_BACKEND=cu130` 확인 (mise.toml) |
 | `loss 가 8.0 에서 안 떨어짐` | `learning_rate: 2e-4` → `1e-4` 로 줄이기 |
-| `outputs/qwen2.5-1.5b-sft-merge` 가 없음 | train은 merge를 자동으로 만들지 않음. **Stage 5 `axolotl merge-lora` 명령 실행 필수** (`lora_model_dir`는 merge 출력 경로가 아니라 어댑터 **입력** 경로임) |
+| `data/sft-full-out/merged` 가 없음 | train은 merge를 자동으로 만들지 않음. **Stage 5 `axolotl merge-lora` 명령 실행 필수** (`lora_model_dir`는 merge 출력 경로가 아니라 어댑터 **입력** 경로임) |
 
 ---
 
@@ -221,7 +227,7 @@ uv run query_sft.py --mode full
 
 ```bash
 uv run query_base.py "Q"  \
-  &&  uv run axolotl train configs/qwen2.5-1.5b-sft.yaml  \
-  &&  uv run axolotl merge-lora configs/qwen2.5-1.5b-sft.yaml --lora-model-dir ./outputs/qwen2.5-1.5b-sft --output-dir ./outputs/qwen2.5-1.5b-sft-merge  \
+  &&  ./sft-06-run-axolotl.sh  \
+  &&  ./sft-07-merge.sh  \
   &&  uv run query_sft.py --mode full "Q"
 ```

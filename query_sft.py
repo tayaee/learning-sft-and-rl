@@ -3,12 +3,12 @@
 
 사용법:
     uv run query_sft.py --mode full "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
-    uv run query_sft.py --mode smoke "..."
+    uv run query_sft.py --mode mini "..."
     uv run query_sft.py --mode full                   # REPL 모드
 
 모델 경로:
-    full  → ./outputs/qwen2.5-1.5b-sft-merge/merged
-    smoke → ./outputs/qwen2.5-1.5b-sft-smoke-merge/merged
+    full  → ./data/sft-full-out/merged
+    mini → ./data/sft-mini-out/merged
 사전 요구: sft-demo.md 의 학습+merge 완료 (--mode 와 일치해야 함)
 """
 from __future__ import annotations
@@ -24,16 +24,16 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODEL_PATHS = {
-    "smoke": "./outputs/qwen2.5-1.5b-sft-smoke-merge/merged",
-    "full": "./outputs/qwen2.5-1.5b-sft-merge/merged",
+    "mini": "./data/sft-mini-out/merged",
+    "full": "./data/sft-full-out/merged",
 }
 
 
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="SFT merge 모델 추론")
     p.add_argument("prompt", nargs="*", help="한글 질문 (없으면 REPL)")
-    p.add_argument("--mode", choices=["smoke", "full"], required=True,
-                   help="smoke 또는 full — 반드시 지정")
+    p.add_argument("--mode", choices=["mini", "full"], required=True,
+                   help="mini 또는 full — 반드시 지정")
     p.add_argument("--max-new-tokens", type=int, default=512)
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--dtype", default="bfloat16",

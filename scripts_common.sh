@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts_common.sh — smoke|full 모드 검증 및 _make 조건부 빌드(Make 스타일) 공통 함수
+# scripts_common.sh — mini|full 모드 검증 및 _make 조건부 빌드(Make 스타일) 공통 함수
 
 FORCE="${FORCE:-0}"
 
@@ -22,17 +22,17 @@ require_mode() {
     case "$arg" in
       -f|--force)
         ;;
-      smoke|full)
+      mini|full)
         mode="$arg"
         ;;
     esac
   done
 
   if [ -z "$mode" ]; then
-    if [ "$default_mode" = "smoke" ] || [ "$default_mode" = "full" ]; then
+    if [ "$default_mode" = "mini" ] || [ "$default_mode" = "full" ]; then
       mode="$default_mode"
     else
-      echo "ERROR: 사용법: $script smoke|full [-f]  (smoke 또는 full 을 반드시 지정하세요)" >&2
+      echo "ERROR: 사용법: $script mini|full [-f]  (mini 또는 full 을 반드시 지정하세요)" >&2
       exit 1
     fi
   fi

@@ -4,10 +4,10 @@ source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
 
-if [ "$MODE" = "smoke" ]; then
-  MODEL=./outputs/qwen2.5-1.5b-rl-grpo-smoke-merge/merged
+if [ "$MODE" = "mini" ]; then
+  MODEL=./data/grpo-mini-out/merged
 else
-  MODEL=./outputs/qwen2.5-1.5b-rl-grpo-merge/merged
+  MODEL=./data/grpo-full-out/merged
 fi
 
 OUT=./outputs/lm_eval_results/rl-grpo-$MODE

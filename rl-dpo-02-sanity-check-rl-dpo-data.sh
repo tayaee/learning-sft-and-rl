@@ -3,8 +3,8 @@
 source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
-SAMPLE="data/$MODE/sample_rl-dpo.jsonl"
-DATA="data/$MODE/train_rl-dpo.jsonl"
+SAMPLE="data/dpo-$MODE-out/sample_rl-dpo.jsonl"
+DATA="data/dpo-$MODE-out/train_rl-dpo.jsonl"
 
 echo "input: $SAMPLE, $DATA"
 echo "output: (stdout)"

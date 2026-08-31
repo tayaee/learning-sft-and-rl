@@ -1,5 +1,5 @@
 # lm-eval config — SFT 모델
-lm_eval_model: ./outputs/qwen2.5-1.5b-sft-merge/merged
+lm_eval_model: ./data/sft-full-out/merged
 lm_eval_tasks:
   - kobest_hellaswag
   - kobest_copa

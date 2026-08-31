@@ -1,6 +1,6 @@
 # RL Demo — DPO on top of SFT'd Qwen2.5-1.5B
 
-> **목적**: SFT'd 모델(`outputs/qwen2.5-1.5b-sft-merge/merged`)을 시작점으로,
+> **목적**: SFT'd 모델(`data/sft-full-out/merged`)을 시작점으로,
 > **합성 선호 데이터** 로 **DPO** 를 추가 학습해 응답 일관성·구조를 더 강화.
 > 사전 조건: [`sft-demo.md`](sft-demo.md) Stage 4 완료 (SFT merge 폴더 존재).
 
@@ -22,29 +22,29 @@
 
 ---
 
-> **모드 규약**: 학습/merge/추론 스크립트는 `smoke` 또는 `full` 을 **반드시 인자로 지정**해야 합니다.
-> - `smoke`: 파이프라인 점검용 (소량 데이터 + max_steps 3~10, 수분 내 완주)
+> **모드 규약**: 학습/merge/추론 스크립트는 `mini` 또는 `full` 을 **반드시 인자로 지정**해야 합니다.
+> - `mini`: 파이프라인 점검용 (소량 데이터 + max_steps 3~10, 수분 내 완주)
 > - `full`: 실제 학습 (기존과 동일한 full 설정)
-> 예: `./sft-06-run-axolotl-smoke.sh`(또는 `./sft-06-run-axolotl.sh smoke`) → `./sft-07-merge-smoke.sh` → `uv run query_sft.py --mode smoke "..."`
-> 모드 지정 스크립트에는 `<script>-smoke.sh` / `<script>-full.sh` 래퍼가 준비되어 있다.
+> 예: `./sft-06-run-axolotl-mini.sh`(또는 `./sft-06-run-axolotl.sh mini`) → `./sft-07-merge-mini.sh` → `uv run query_sft.py --mode mini "..."`
+> 모드 지정 스크립트에는 `<script>-mini.sh` / `<script>-full.sh` 래퍼가 준비되어 있다.
 
 ## 1. 선호 데이터 생성 (10–30분)
 
 ```bash
 cd /home/user1/git/learning-sft-and-rl
 # 권장: 드라이버 스크립트 사용 (모드별 SFT 모델/경로 자동 선택)
-./rl-dpo-01-make-rl-dpo-data.sh full     # → data/full/train_rl-dpo.jsonl (+ sample)
-./rl-dpo-01-make-rl-dpo-data.sh smoke    # → data/smoke/train_rl-dpo.jsonl (+ sample)
+./rl-dpo-01-make-rl-dpo-data.sh full     # → data/dpo-full-out/train_rl-dpo.jsonl (+ sample)
+./rl-dpo-01-make-rl-dpo-data.sh mini    # → data/dpo-mini-out/train_rl-dpo.jsonl (+ sample)
 
 # 직접 실행할 경우 (full 예시):
 # 베이스 + SFT'd 모델 로드 → 1000 prompts × 4 samples K=4 → 1000 pairs
 uv run python make_rl_dpo_data.py \
-  --sft-model ./outputs/qwen2.5-1.5b-sft-merge/merged \
+  --sft-model ./data/sft-full-out/merged \
   --base-model Qwen/Qwen2.5-1.5B-Instruct \
   --num-prompts 1000 \
   --samples-per-prompt 4 \
-  --out data/full/train_rl-dpo.jsonl \
-  --sample-out data/full/sample_rl-dpo.jsonl
+  --out data/dpo-full-out/train_rl-dpo.jsonl \
+  --sample-out data/dpo-full-out/sample_rl-dpo.jsonl
 ```
 
 **생성 원리**:
@@ -55,13 +55,13 @@ uv run python make_rl_dpo_data.py \
 5. 베이스 모델 출력 (T=0.0) 도 rejected 후보로 추가
 
 **출력**:
-- `data/<mode>/train_rl-dpo.jsonl` — DPO 학습용 (full 1000 / smoke 50 pairs)
-- `data/<mode>/sample_rl-dpo.jsonl` — 디버깅용 샘플
+- `data/{stage}-{mode}-out/train_rl-dpo.jsonl` — DPO 학습용 (full 1000 / mini 50 pairs)
+- `data/{stage}-{mode}-out/sample_rl-dpo.jsonl` — 디버깅용 샘플
 
 확인:
 ```bash
-wc -l data/full/train_rl-dpo.jsonl data/full/sample_rl-dpo.jsonl
-head -1 data/full/sample_rl-dpo.jsonl | uv run python -m json.tool | head -10
+wc -l data/dpo-full-out/train_rl-dpo.jsonl data/dpo-full-out/sample_rl-dpo.jsonl
+head -1 data/dpo-full-out/sample_rl-dpo.jsonl | uv run python -m json.tool | head -10
 ```
 
 ---
@@ -70,7 +70,7 @@ head -1 data/full/sample_rl-dpo.jsonl | uv run python -m json.tool | head -10
 
 ```bash
 # 같은 prompt 에 대한 chosen vs rejected 비교 (./rl-dpo-02-sanity-check-rl-dpo-data.sh <mode>)
-head -1 data/full/sample_rl-dpo.jsonl | uv run python -c "
+head -1 data/dpo-full-out/sample_rl-dpo.jsonl | uv run python -c "
 import json, sys
 d = json.loads(sys.stdin.read())
 print('=== PROMPT ===')
@@ -89,11 +89,11 @@ print(d['rejected'][:400])
 ## 3. DPO config 검증 (1분)
 
 ```bash
-cat configs/qwen2.5-1.5b-rl-dpo.yaml | head -20
+cat data/dpo-full-config/qwen2.5-1.5b-rl-dpo.yaml | head -20
 ```
 
 핵심 파라미터:
-- `base_model: ./outputs/qwen2.5-1.5b-sft-merge/merged` (SFT'd 모델에서 시작)
+- `base_model: ./data/sft-full-out/merged` (SFT'd 모델에서 시작)
 - `rl: dpo`, `dpo_beta: 0.1`, `dpo_loss_type: sigmoid`
 - `ref_model: Qwen/Qwen2.5-1.5B-Instruct` (베이스 모델이 reference)
 - `learning_rate: 5e-6` (DPO는 SFT보다 10–20× 낮은 LR)
@@ -110,15 +110,15 @@ cd /home/user1/git/learning-sft-and-rl
 watch -n 5 nvidia-smi
 
 # 학습 시작
-uv run axolotl train configs/qwen2.5-1.5b-rl-dpo.yaml 2>&1 | tee logs/rl-dpo.log
+uv run axolotl train data/dpo-full-config/qwen2.5-1.5b-rl-dpo.yaml 2>&1 | tee logs/rl-dpo.log
 ```
 
 **체크 포인트**:
 - DPO loss  시작 ~0.69 → 점진적 감소
 - `reward_margin` (chosen - rejected 보상 차이)  양수로 증가 ⇒ 정상
 - DPO 는 SFT보다 훨씬 빠름 (1k pairs × 1 epoch)
-- 완료 시 `./outputs/qwen2.5-1.5b-rl-dpo/` 에 **LoRA 어댑터만** 저장됨
-- merge된 모델은 Stage 5에서 별도 생성 (`./outputs/qwen2.5-1.5b-rl-dpo-merge/merged/`)
+- 완료 시 `./data/dpo-full-out/adapter/` 에 **LoRA 어댑터만** 저장됨
+- merge된 모델은 Stage 5에서 별도 생성 (`./data/dpo-full-out/merged/`)
 
 ---
 
@@ -133,11 +133,11 @@ cd /home/user1/git/learning-sft-and-rl
 ```
 
 - axolotl은 항상 `output_dir` 하위에 `merged/` 폴더를 만들어 저장
-  → 최종 경로: `./outputs/qwen2.5-1.5b-rl-dpo-merge/merged/`
+  → 최종 경로: `./data/dpo-full-out/merged/`
 
 확인:
 ```bash
-ls outputs/qwen2.5-1.5b-rl-dpo-merge/merged/   # config.json, model.safetensors, tokenizer.* 등
+ls data/dpo-full-out/merged/merged/   # config.json, model.safetensors, tokenizer.* 등
 ```
 
 ---
@@ -146,7 +146,7 @@ ls outputs/qwen2.5-1.5b-rl-dpo-merge/merged/   # config.json, model.safetensors,
 
 ```bash
 # merge 폴더 확인
-ls outputs/qwen2.5-1.5b-rl-dpo-merge/merged/
+ls data/dpo-full-out/merged/merged/
 
 # 추론
 uv run query_rl_dpo.py --mode full "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
@@ -161,8 +161,8 @@ uv run query_rl_dpo.py --mode full "방정식 x^2 + 5x + 6 = 0 의 해를 구하
 | 모델 | 스크립트 | 경로 |
 |------|----------|------|
 | BASE | `query_base.py` | `Qwen/Qwen2.5-1.5B-Instruct` |
-| SFTED | `query_sft.py` | `./outputs/qwen2.5-1.5b-sft-merge/merged` |
-| RL | `query_rl_dpo.py` | `./outputs/qwen2.5-1.5b-rl-dpo-merge/merged` |
+| SFTED | `query_sft.py` | `./data/sft-full-out/merged` |
+| RL | `query_rl_dpo.py` | `./data/dpo-full-out/merged` |
 
 ```bash
 # 3-way 동일 질문 비교
@@ -187,14 +187,14 @@ uv run query_rl_dpo.py --mode full
 각 task 당 100 samples 제한 (`--limit 100`) 으로 sanity check 용도.
 
 ```bash
-./rl-dpo-09-lm-eval-rl-dpo.sh full      # smoke 면 ./rl-dpo-09-lm-eval-rl-dpo.sh smoke
+./rl-dpo-09-lm-eval-rl-dpo.sh full      # mini 면 ./rl-dpo-09-lm-eval-rl-dpo.sh mini
 ```
 
 평가 tasks:
 - 한국어: `kobest_hellaswag`, `kobest_copa`, `kmmlu`
 - 영어: `hellaswag`, `arc_easy`, `piqa`, `winogrande`
 
-결과는 `outputs/lm_eval_results/rl-dpo-full/` (smoke 는 `rl-dpo-smoke/`) 에 저장됨.
+결과는 `outputs/lm_eval_results/rl-dpo-full/` (mini 는 `rl-dpo-mini/`) 에 저장됨.
 비교용 BASE/SFT 점수는 [`sft-demo.md`](sft-demo.md) Stage 8 의 `sft-10`, `sft-11` 결과와 함께 봐야 함.
 
 > 참고: chat template 적용 모델의 경우 `kmmlu` 가 raw 점수보다 낮게
@@ -222,7 +222,7 @@ DPO 의 효과:
 ```bash
 # SFT 가 끝났다면
 uv run python make_rl_dpo_data.py && \
-  uv run axolotl train configs/qwen2.5-1.5b-rl-dpo.yaml && \
+  uv run axolotl train data/dpo-full-config/qwen2.5-1.5b-rl-dpo.yaml && \
   ./rl-dpo-06-merge.sh full && \
   uv run query_rl_dpo.py --mode full
 ```
@@ -236,7 +236,7 @@ uv run python make_rl_dpo_data.py && \
 | `ref_model` 로딩 실패 | `HF_HUB_OFFLINE=1` 유지 + 로컬 캐시 확인 |
 | DPO loss 가 0.69 그대로 | learning_rate 너무 낮음 → `1e-5` 로 |
 | `reward_margin` 음수 | 데이터 품질 문제 → `make_rl_dpo_data.py` 의 `--num-prompts` 늘리기 |
-| `outputs/qwen2.5-1.5b-rl-dpo-merge` 없음 | train 로그 확인. **Stage 5 `axolotl merge-lora` 명령 실행 필수** (train은 LoRA 어댑터만 저장, merge 별도 단계). 또한 `lora_model_dir` 는 merge 출력 경로가 아니라 어댑터 **입력** 경로임 |
+| `data/dpo-full-out/merged` 없음 | train 로그 확인. **Stage 5 `axolotl merge-lora` 명령 실행 필수** (train은 LoRA 어댑터만 저장, merge 별도 단계). 또한 `lora_model_dir` 는 merge 출력 경로가 아니라 어댑터 **입력** 경로임 |
 | 두 모델 출력이 똑같음 | DPO lr/epoch 부족 |
 
 ---
@@ -256,7 +256,7 @@ def math_reward(prompt, response, ground_truth):
 ```
 
 ```yaml
-# configs/qwen2.5-1.5b-rl-grpo.yaml (대략)
+# data/grpo-full-config/qwen2.5-1.5b-rl-grpo.yaml (대략)
 rl: grpo
 reward_fn: path/to/reward_fn.py
 ```

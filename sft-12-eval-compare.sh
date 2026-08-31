@@ -8,12 +8,12 @@ GENERAL_TASKS=tinyArc,tinyHellaswag,tinyMMLU,tinyWinogrande
 KOREAN_TASKS=kobest_copa,kobest_hellaswag
 
 PREV_MODEL=Qwen/Qwen2.5-1.5B-Instruct          # 이전 모델 = base
-if [ "$MODE" = "smoke" ]; then
-  NEW_MODEL=./outputs/qwen2.5-1.5b-sft-smoke-merge/merged
+if [ "$MODE" = "mini" ]; then
+  NEW_MODEL=./data/sft-mini-out/merged
   PREV_LABEL="Base"
-  NEW_LABEL="SFT(smoke)"
+  NEW_LABEL="SFT(mini)"
 else
-  NEW_MODEL=./outputs/qwen2.5-1.5b-sft-merge/merged
+  NEW_MODEL=./data/sft-full-out/merged
   PREV_LABEL="Base"
   NEW_LABEL="SFT(full)"
 fi

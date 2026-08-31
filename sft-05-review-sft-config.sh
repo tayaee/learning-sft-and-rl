@@ -4,10 +4,10 @@ source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-full}" "$0" "$@") || exit 1
 
-if [ "$MODE" = "smoke" ]; then
-  CFG="configs/qwen2.5-1.5b-sft-smoke.yaml"
+if [ "$MODE" = "mini" ]; then
+  CFG="data/sft-mini-config/qwen2.5-1.5b-sft-mini.yaml"
 else
-  CFG="configs/qwen2.5-1.5b-sft.yaml"
+  CFG="data/sft-full-config/qwen2.5-1.5b-sft.yaml"
 fi
 
 echo "input: $CFG"

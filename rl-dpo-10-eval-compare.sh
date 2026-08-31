@@ -7,14 +7,14 @@ MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
 GENERAL_TASKS=tinyArc,tinyHellaswag,tinyMMLU,tinyWinogrande
 KOREAN_TASKS=kobest_copa,kobest_hellaswag
 
-if [ "$MODE" = "smoke" ]; then
-  PREV_MODEL=./outputs/qwen2.5-1.5b-sft-smoke-merge/merged   # 이전 모델 = SFT(smoke)
-  NEW_MODEL=./outputs/qwen2.5-1.5b-rl-dpo-smoke-merge/merged
-  PREV_LABEL="SFT(smoke)"
-  NEW_LABEL="DPO(smoke)"
+if [ "$MODE" = "mini" ]; then
+  PREV_MODEL=./data/sft-mini-out/merged   # 이전 모델 = SFT(mini)
+  NEW_MODEL=./data/dpo-mini-out/merged
+  PREV_LABEL="SFT(mini)"
+  NEW_LABEL="DPO(mini)"
 else
-  PREV_MODEL=./outputs/qwen2.5-1.5b-sft-merge/merged         # 이전 모델 = SFT(full)
-  NEW_MODEL=./outputs/qwen2.5-1.5b-rl-dpo-merge/merged
+  PREV_MODEL=./data/sft-full-out/merged         # 이전 모델 = SFT(full)
+  NEW_MODEL=./data/dpo-full-out/merged
   PREV_LABEL="SFT(full)"
   NEW_LABEL="DPO(full)"
 fi

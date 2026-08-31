@@ -16,17 +16,17 @@ reference model 이 없고 SFT 손실과 선호 손실을 한 번에 학습한�
                   새로 선호 쌍을 생성 (SFT 모델 필요)
 
 출력:  --out 으로 지정한 경로 ({prompt, chosen, rejected})
-       예) full  → data/full/train_rl-orpo.jsonl
-           smoke → data/smoke/train_rl-orpo.jsonl
+       예) full  → data/orpo-full-out/train_rl-orpo.jsonl
+           mini  → data/orpo-mini-out/train_rl-orpo.jsonl
 
 사용:
-    # DPO 데이터 재사용 (권장) — rl-orpo-01-make-orpo-data.sh <smoke|full> 사용 권장
-    uv run python make_rl_orpo_data.py --from-dpo data/full/train_rl-dpo.jsonl \
-        --num-prompts 1000 --out data/full/train_rl-orpo.jsonl
+    # DPO 데이터 재사용 (권장) — rl-orpo-01-make-orpo-data.sh <mini|full> 사용 권장
+    uv run python make_rl_orpo_data.py --from-dpo data/dpo-full-out/train_rl-dpo.jsonl \
+        --num-prompts 1000 --out data/orpo-full-out/train_rl-orpo.jsonl
 
     # 직접 생성 (SFT merge 모델 필요, 시간 오래 걸림)
     uv run python make_rl_orpo_data.py --generate \
-        --sft-model ./outputs/qwen2.5-1.5b-sft-merge/merged --num-prompts 1000
+        --sft-model ./data/sft-full-out/merged --num-prompts 1000
 """
 from __future__ import annotations
 
@@ -67,15 +67,15 @@ def from_dpo(args):
         for r in rows:
             f.write(json.dumps(to_orpo_row(r), ensure_ascii=False) + "\n")
     print(f"[done] {len(rows)} pairs → {args.out}")
-    # --smoke-out 을 명시한 경우에만 smoke 파일을 추가로 생성 (모드 간 덮어쓰기 방지)
-    if args.smoke_out:
-        smoke_dir = os.path.dirname(args.smoke_out)
-        if smoke_dir:
-            os.makedirs(smoke_dir, exist_ok=True)
-        with open(args.smoke_out, "w", encoding="utf-8") as f:
-            for r in rows[: args.smoke_n]:
+    # --mini-out 을 명시한 경우에만 mini 파일을 추가로 생성 (모드 간 덮어쓰기 방지)
+    if args.mini_out:
+        mini_dir = os.path.dirname(args.mini_out)
+        if mini_dir:
+            os.makedirs(mini_dir, exist_ok=True)
+        with open(args.mini_out, "w", encoding="utf-8") as f:
+            for r in rows[: args.mini_n]:
                 f.write(json.dumps(to_orpo_row(r), ensure_ascii=False) + "\n")
-        print(f"[done] {min(len(rows), args.smoke_n)} pairs → {args.smoke_out}")
+        print(f"[done] {min(len(rows), args.mini_n)} pairs → {args.mini_out}")
 
 
 def generate(args):
@@ -129,11 +129,11 @@ def generate(args):
                 print(f"[gen] {i+1}/{len(rows)}  pairs={n}", flush=True)
     print(f"[done] {n} pairs → {args.out}")
 
-    # smoke 용은 앞부분 잘라 저장
+    # mini 용은 앞부분 잘라 저장
     with open(args.out, encoding="utf-8") as src, \
-         open(args.smoke_out, "w", encoding="utf-8") as dst:
+         open(args.mini_out, "w", encoding="utf-8") as dst:
         for j, line in enumerate(src):
-            if j >= args.smoke_n:
+            if j >= args.mini_n:
                 break
             dst.write(line)
 
@@ -143,16 +143,16 @@ def main():
     ap.add_argument("--from-dpo", default=None,
                     help="재사용할 DPO 선호 쌍 jsonl (지정 시 재사용 모드)")
     ap.add_argument("--generate", action="store_true", help="직접 생성 모드")
-    ap.add_argument("--sft-model", default="./outputs/qwen2.5-1.5b-sft-merge/merged")
+    ap.add_argument("--sft-model", default="./data/sft-full-out/merged")
     ap.add_argument("--base-model", default="Qwen/Qwen2.5-1.5B-Instruct")
     ap.add_argument("--train-jsonl", default="train.jsonl")
-    ap.add_argument("--out", default="data/full/train_rl-orpo.jsonl")
-    ap.add_argument("--smoke-out", default=None,
-                    help="지정 시 소량 smoke 파일을 추가 생성 (기본: 생성 안 함)")
+    ap.add_argument("--out", default="data/orpo-full-out/train_rl-orpo.jsonl")
+    ap.add_argument("--mini-out", default=None,
+                    help="지정 시 소량 mini 파일을 추가 생성 (기본: 생성 안 함)")
     ap.add_argument("--num-prompts", type=int, default=1000)
     ap.add_argument("--samples-per-prompt", type=int, default=4)
     ap.add_argument("--max-new-tokens", type=int, default=512)
-    ap.add_argument("--smoke-n", type=int, default=20)
+    ap.add_argument("--mini-n", type=int, default=20)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--dtype", default="bfloat16")
     args = ap.parse_args()

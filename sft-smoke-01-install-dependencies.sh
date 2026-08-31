@@ -1,1 +1,0 @@
-sft-01-install-dependencies.sh

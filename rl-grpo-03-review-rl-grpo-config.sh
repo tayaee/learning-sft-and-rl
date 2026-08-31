@@ -4,10 +4,10 @@ source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-}" "$0" "$@") || exit 1
 
-if [ "$MODE" = "smoke" ]; then
-  CFG="configs/qwen2.5-1.5b-rl-grpo-smoke.yaml"
+if [ "$MODE" = "mini" ]; then
+  CFG="data/grpo-mini-config/qwen2.5-1.5b-rl-grpo-mini.yaml"
 else
-  CFG="configs/qwen2.5-1.5b-rl-grpo.yaml"
+  CFG="data/grpo-full-config/qwen2.5-1.5b-rl-grpo.yaml"
 fi
 
 echo "input: $CFG"

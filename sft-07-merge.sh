@@ -4,14 +4,14 @@ source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
 MODE=$(require_mode "${1:-full}" "$0" "$@") || exit 1
 
-if [ "$MODE" = "smoke" ]; then
-  CFG=configs/qwen2.5-1.5b-sft-smoke.yaml
-  ADAPTER=./outputs/qwen2.5-1.5b-sft-smoke
-  OUT=./outputs/qwen2.5-1.5b-sft-smoke-merge
+if [ "$MODE" = "mini" ]; then
+  CFG=data/sft-mini-config/qwen2.5-1.5b-sft-mini.yaml
+  ADAPTER=./data/sft-mini-out/adapter
+  OUT=./data/sft-mini-out
 else
-  CFG=configs/qwen2.5-1.5b-sft.yaml
-  ADAPTER=./outputs/qwen2.5-1.5b-sft
-  OUT=./outputs/qwen2.5-1.5b-sft-merge
+  CFG=data/sft-full-config/qwen2.5-1.5b-sft.yaml
+  ADAPTER=./data/sft-full-out/adapter
+  OUT=./data/sft-full-out
 fi
 
 echo "input: $CFG, $ADAPTER"

@@ -5,7 +5,7 @@
     uv run query_rl_grpo.py "방정식 x^2 + 5x + 6 = 0 의 해를 구하시오."
     uv run query_rl_grpo.py                # REPL 모드
 
-모델 경로: ./outputs/qwen2.5-1.5b-rl-grpo-merge (GRPO 학습 후 merge된 모델)
+모델 경로: ./data/grpo-{mode}-out/merged (GRPO 학습 후 merge된 모델)
 사전 요구: rl-grpo-demo.md 의 Stage 4 (GRPO axolotl train) 완료
 """
 from __future__ import annotations
@@ -21,16 +21,16 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODEL_PATHS = {
-    "smoke": "./outputs/qwen2.5-1.5b-rl-grpo-smoke-merge/merged",
-    "full":  "./outputs/qwen2.5-1.5b-rl-grpo-merge/merged",
+    "mini": "./data/grpo-mini-out/merged",
+    "full":  "./data/grpo-full-out/merged",
 }
 
 
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="GRPO merge 모델 추론")
     p.add_argument("prompt", nargs="*", help="한글 질문 (없으면 REPL)")
-    p.add_argument("--mode", choices=["smoke", "full"], required=True,
-                   help="smoke 또는 full — 반드시 지정")
+    p.add_argument("--mode", choices=["mini", "full"], required=True,
+                   help="mini 또는 full — 반드시 지정")
     p.add_argument("--max-new-tokens", type=int, default=512)
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--dtype", default="bfloat16",

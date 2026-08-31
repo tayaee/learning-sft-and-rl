@@ -1,33 +1,16 @@
 #!/bin/bash
-# sft-06: SFT 학습 (smoke / full 선택 — 생략 시 full 기본)
+# sft-06: SFT 학습 (full 모드)
 source "$(dirname "$0")/scripts_common.sh"
 parse_flags "$@"
-MODE=$(require_mode "${1:-full}" "$0" "$@") || exit 1
 
-if [ "$MODE" = "smoke" ]; then
-  CFG=configs/qwen2.5-1.5b-sft-smoke.yaml
-  LOG=logs/sft-smoke.log
-  OUT_DIR=./outputs/qwen2.5-1.5b-sft-smoke
-  IN_DATA="data/smoke/train-sft.jsonl"
-  OUT_EXTRA=", data/smoke/train-sft.jsonl"
-  echo "input: $CFG, $IN_DATA"
-  echo "output: $OUT_DIR, $LOG$OUT_EXTRA"
-  if [ ! -f data/smoke/train-sft.jsonl ]; then
-    ensure_train_jsonl || exit 1
-    mkdir -p data/smoke
-    head -n 200 train.jsonl > data/smoke/train-sft.jsonl
-    wc -l data/smoke/train-sft.jsonl
-  fi
-else
-  CFG=configs/qwen2.5-1.5b-sft.yaml
-  LOG=logs/sft.log
-  OUT_DIR=./outputs/qwen2.5-1.5b-sft
-  IN_DATA="train.jsonl"
-  OUT_EXTRA=""
-  echo "input: $CFG, $IN_DATA"
-  echo "output: $OUT_DIR, $LOG"
-  ensure_train_jsonl || exit 1
-fi
+CFG=data/sft-full-config/qwen2.5-1.5b-sft.yaml
+LOG=logs/sft.log
+OUT_DIR=./data/sft-full-out/adapter
+IN_DATA="train.jsonl"
+OUT_EXTRA=""
+echo "input: $CFG, $IN_DATA"
+echo "output: $OUT_DIR, $LOG$OUT_EXTRA"
+ensure_train_jsonl || exit 1
 
 mkdir -p logs
 
